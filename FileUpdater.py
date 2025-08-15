@@ -312,6 +312,7 @@ class ConfigManager:
         },
         "file": {
             "last_directory": "",
+            "last_file_path": "",
             "remember_encoding": True,
             "auto_detect_encoding": True
         },
@@ -693,6 +694,14 @@ class LogViewerApp(tk.Tk):
         self._load_filter_preferences()
         
         self._apply_theme()  # Apply initial theme
+        
+        # Check if we should open the last file from config
+        if not self.path:  # Only if no file was passed via command line
+            last_file_path = self.config_manager.get('file.last_file_path', '')
+            if last_file_path and os.path.exists(last_file_path):
+                self.path = last_file_path
+                self._set_status(f"Opening last file: {os.path.basename(last_file_path)}")
+        
         if self.path:
             self._open_path(self.path, first_open=True)
         self.after(self.refresh_ms.get(), self._poll)
@@ -891,8 +900,9 @@ class LogViewerApp(tk.Tk):
         xscroll = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.text.xview)
         self.text.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
 
-        # Pack widgets
-        self.line_numbers.pack(side=tk.LEFT, fill=tk.Y)
+        # Pack widgets - only show line numbers if configured to do so
+        if self.show_line_numbers.get():
+            self.line_numbers.pack(side=tk.LEFT, fill=tk.Y)
         self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         yscroll.pack(side=tk.RIGHT, fill=tk.Y)
         
@@ -1210,7 +1220,15 @@ class LogViewerApp(tk.Tk):
             # Save current theme
             self.config_manager.set('theme.current', self.theme_manager.current_theme)
             
-            # Save to file
+            # Save current file path if one is open
+            if hasattr(self, 'path') and self.path:
+                self.config_manager.set('file.last_file_path', self.path)
+                # Also save the directory for the file dialog
+                last_dir = os.path.dirname(self.path)
+                if last_dir:
+                    self.config_manager.set('file.last_directory', last_dir)
+            
+            # Save configuration
             self.config_manager.save_config()
             
             self._set_status("Current settings saved as default")
@@ -1278,6 +1296,14 @@ class LogViewerApp(tk.Tk):
             
             # Save current theme
             self.config_manager.set('theme.current', self.theme_manager.current_theme)
+            
+            # Save current file path if one is open
+            if hasattr(self, 'path') and self.path:
+                self.config_manager.set('file.last_file_path', self.path)
+                # Also save the directory for the file dialog
+                last_dir = os.path.dirname(self.path)
+                if last_dir:
+                    self.config_manager.set('file.last_directory', last_dir)
             
             # Save configuration
             self.config_manager.save_config()
