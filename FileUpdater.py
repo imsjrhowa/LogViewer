@@ -1427,6 +1427,9 @@ class LogViewerApp(tk.Tk):
         if hasattr(self, 'theme_label'):
             self.theme_label.configure(text=f"🎨 {theme['name']}")
         
+        # Update application icon to match theme
+        self._set_app_icon()
+        
         # Save theme preference
         self._save_theme_preference()
         
@@ -1689,6 +1692,34 @@ Tips:
         y = int((screen_height - window_height) / 2)
         
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
+    def _set_app_icon(self):
+        """Sets the application icon based on the current theme."""
+        try:
+            current_theme = self.theme_manager.current_theme
+            icon_path = os.path.join(os.path.dirname(__file__), "icons", f"{current_theme}.ico")
+            print(f"Debug: Setting icon for theme '{current_theme}' from: {icon_path}")
+            
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+                print(f"Debug: Icon set successfully: {icon_path}")
+            else:
+                # Fallback to a generic icon if theme-specific one doesn't exist
+                fallback_path = os.path.join(os.path.dirname(__file__), "icons", "default.ico")
+                print(f"Debug: Theme icon not found, using fallback: {fallback_path}")
+                if os.path.exists(fallback_path):
+                    self.iconbitmap(fallback_path)
+                else:
+                    print(f"Debug: No fallback icon found either")
+        except Exception as e:
+            print(f"Debug: Error setting icon: {e}")
+            # Fallback to a generic icon if iconbitmap fails
+            try:
+                fallback_path = os.path.join(os.path.dirname(__file__), "icons", "default.ico")
+                if os.path.exists(fallback_path):
+                    self.iconbitmap(fallback_path)
+            except Exception as e2:
+                print(f"Debug: Fallback icon also failed: {e2}")
 
 
 def main():
