@@ -606,7 +606,7 @@ class TailReader:
 
         self._pos = self._fh.tell()
 
-        # Heuristic: if we don’t have a BOM and see lots of NULs, switch to utf-16-le
+        # Heuristic: if we don't have a BOM and see lots of NULs, switch to utf-16-le
         if self.encoding in ("utf-8", "utf-8-sig") and data and data.count(b"\x00") > len(data) // 4:
             self.encoding = "utf-16-le"
 
@@ -682,6 +682,9 @@ class LogViewerApp(tk.Tk):
                 # Update menu checkmarks
                 for name, var in self.theme_vars.items():
                     var.set(name == saved_theme)
+        
+        # Ensure the icon is set for the current theme (command line or saved)
+        self._set_app_icon()
         
         # Load saved filter preferences
         self._load_filter_preferences()
@@ -1469,25 +1472,19 @@ class LogViewerApp(tk.Tk):
             pass
     
     def _save_theme_preference(self):
-        """Save current theme preference to a simple config file."""
+        """Save current theme preference to the configuration system."""
         try:
-            config_dir = os.path.expanduser("~/.logviewer")
-            os.makedirs(config_dir, exist_ok=True)
-            config_file = os.path.join(config_dir, "theme.txt")
-            with open(config_file, 'w') as f:
-                f.write(self.theme_manager.current_theme)
+            self.config_manager.set('theme.current', self.theme_manager.current_theme)
+            self.config_manager.save_config()
         except Exception:
             pass  # Silently fail if we can't save preferences
     
     def _load_theme_preference(self) -> str:
-        """Load saved theme preference. Returns default if none saved."""
+        """Load saved theme preference from the configuration system."""
         try:
-            config_file = os.path.join(os.path.expanduser("~/.logviewer"), "theme.txt")
-            if os.path.exists(config_file):
-                with open(config_file, 'r') as f:
-                    theme = f.read().strip()
-                    if theme in self.theme_manager.get_theme_names():
-                        return theme
+            saved_theme = self.config_manager.get('theme.current', DEFAULT_THEME)
+            if saved_theme in self.theme_manager.get_theme_names():
+                return saved_theme
         except Exception:
             pass
         return DEFAULT_THEME
@@ -1698,28 +1695,17 @@ Tips:
         try:
             current_theme = self.theme_manager.current_theme
             icon_path = os.path.join(os.path.dirname(__file__), "icons", f"{current_theme}.ico")
-            print(f"Debug: Setting icon for theme '{current_theme}' from: {icon_path}")
             
             if os.path.exists(icon_path):
                 self.iconbitmap(icon_path)
-                print(f"Debug: Icon set successfully: {icon_path}")
             else:
                 # Fallback to a generic icon if theme-specific one doesn't exist
                 fallback_path = os.path.join(os.path.dirname(__file__), "icons", "default.ico")
-                print(f"Debug: Theme icon not found, using fallback: {fallback_path}")
                 if os.path.exists(fallback_path):
                     self.iconbitmap(fallback_path)
-                else:
-                    print(f"Debug: No fallback icon found either")
-        except Exception as e:
-            print(f"Debug: Error setting icon: {e}")
-            # Fallback to a generic icon if iconbitmap fails
-            try:
-                fallback_path = os.path.join(os.path.dirname(__file__), "icons", "default.ico")
-                if os.path.exists(fallback_path):
-                    self.iconbitmap(fallback_path)
-            except Exception as e2:
-                print(f"Debug: Fallback icon also failed: {e2}")
+        except Exception:
+            # Silently fail if icon setting fails
+            pass
 
 
 def main():
