@@ -882,9 +882,7 @@ class LogViewerApp(tk.Tk):
             relief=tk.FLAT,
             borderwidth=0,
             state=tk.DISABLED,
-            font=("Consolas", 11),
-            background="#f0f0f0",
-            foreground="#666666"
+            font=("Consolas", 11)
         )
         
         # Main text widget
@@ -1480,6 +1478,16 @@ class LogViewerApp(tk.Tk):
             selectforeground=theme["text_fg"]
         )
         
+        # Configure line numbers widget
+        if hasattr(self, 'line_numbers'):
+            self.line_numbers.configure(
+                bg=theme["text_bg"],
+                fg=theme["text_fg"],
+                insertbackground=theme["insert_bg"],
+                selectbackground=theme["menu_select_bg"],
+                selectforeground=theme["text_fg"]
+            )
+        
         # Configure toolbar (if using ttk, this may have limited effect)
         try:
             style = ttk.Style()
@@ -1638,7 +1646,7 @@ Tips:
         """Show a preview of all available themes."""
         preview_window = tk.Toplevel(self)
         preview_window.title("Theme Preview")
-        preview_window.geometry("400x300")
+        preview_window.geometry("400x360")
         preview_window.resizable(False, False)
         preview_window.transient(self)
         preview_window.grab_set()
@@ -1885,6 +1893,14 @@ Tips:
         # Schedule line number update after a short delay to ensure scroll completes
         # Use debouncing to prevent rapid updates during fast scrolling
         self._wheel_sync_job = self.after(20, self._sync_scroll)
+
+    def _reset_settings(self):
+        """Reset all settings to default values."""
+        if messagebox.askyesno("Reset Settings", 
+                              "Are you sure you want to reset all settings to default values?\n\nThis cannot be undone."):
+            self.config_manager.reset_to_defaults()
+            self._set_status("Settings reset to defaults")
+            messagebox.showinfo("Reset Complete", "All settings have been reset to default values.\n\nRestart the application to apply the changes.")
 
 
 def main():
