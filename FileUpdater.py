@@ -28,8 +28,10 @@ import sys
 import time
 import tkinter as tk
 import collections
+import re
+import json
 from tkinter import ttk, filedialog, messagebox
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 
 MAX_LINES_DEFAULT = 10_000
 DEFAULT_REFRESH_MS = 500
@@ -133,6 +135,379 @@ class ThemeManager:
     def get_theme_display_names(self) -> list:
         """Get list of theme display names."""
         return [self.THEMES[name]["name"] for name in self.THEMES]
+
+
+class FilterManager:
+    """Advanced filtering system for log entries with multiple modes and history."""
+    
+    # Filter modes
+    MODES = {
+        "contains": "Contains",
+        "starts_with": "Starts With", 
+        "ends_with": "Ends With",
+        "regex": "Regular Expression",
+        "exact": "Exact Match",
+        "not_contains": "Not Contains"
+    }
+    
+    def __init__(self):
+        self.current_filter = ""
+        self.current_mode = "contains"
+        self.case_sensitive = False
+        self.filter_history = []
+        self.max_history = 20
+        self.compiled_regex = None
+        self.last_error = None
+        
+    def set_filter(self, text: str, mode: str = None, case_sensitive: bool = None) -> bool:
+        """Set the current filter. Returns True if filter changed."""
+        if mode is not None:
+            self.current_mode = mode
+        if case_sensitive is not None:
+            self.case_sensitive = case_sensitive
+            
+        if text != self.current_filter:
+            self.current_filter = text
+            self._add_to_history(text)
+            self._compile_regex()
+            return True
+        return False
+    
+    def _add_to_history(self, text: str):
+        """Add filter text to history if it's not empty and not already there."""
+        if text and text not in self.filter_history:
+            self.filter_history.insert(0, text)
+            if len(self.filter_history) > self.max_history:
+                self.filter_history.pop()
+    
+    def _compile_regex(self):
+        """Compile regex pattern if mode is regex."""
+        self.compiled_regex = None
+        self.last_error = None
+        
+        if self.current_mode == "regex" and self.current_filter:
+            try:
+                flags = 0 if self.case_sensitive else re.IGNORECASE
+                self.compiled_regex = re.compile(self.current_filter, flags)
+            except re.error as e:
+                self.last_error = str(e)
+    
+    def matches(self, line: str) -> bool:
+        """Check if a line matches the current filter."""
+        if not self.current_filter:
+            return True
+            
+        if self.last_error:
+            return False
+            
+        try:
+            if self.current_mode == "contains":
+                return self._contains_match(line)
+            elif self.current_mode == "starts_with":
+                return self._starts_with_match(line)
+            elif self.current_mode == "ends_with":
+                return self._ends_with_match(line)
+            elif self.current_mode == "regex":
+                return self._regex_match(line)
+            elif self.current_mode == "exact":
+                return self._exact_match(line)
+            elif self.current_mode == "not_contains":
+                return self._not_contains_match(line)
+            else:
+                return self._contains_match(line)
+        except Exception:
+            return False
+    
+    def _contains_match(self, line: str) -> bool:
+        """Check if line contains the filter text."""
+        if self.case_sensitive:
+            return self.current_filter in line
+        return self.current_filter.lower() in line.lower()
+    
+    def _starts_with_match(self, line: str) -> bool:
+        """Check if line starts with the filter text."""
+        if self.case_sensitive:
+            return line.startswith(self.current_filter)
+        return line.lower().startswith(self.current_filter.lower())
+    
+    def _ends_with_match(self, line: str) -> bool:
+        """Check if line ends with the filter text."""
+        if self.case_sensitive:
+            return line.endswith(self.current_filter)
+        return line.lower().endswith(self.current_filter.lower())
+    
+    def _regex_match(self, line: str) -> bool:
+        """Check if line matches the regex pattern."""
+        if self.compiled_regex:
+            return bool(self.compiled_regex.search(line))
+        return False
+    
+    def _exact_match(self, line: str) -> bool:
+        """Check if line exactly matches the filter text."""
+        if self.case_sensitive:
+            return line == self.current_filter
+        return line.lower() == self.current_filter.lower()
+    
+    def _not_contains_match(self, line: str) -> bool:
+        """Check if line does NOT contain the filter text."""
+        return not self._contains_match(line)
+    
+    def get_filter_info(self) -> Dict[str, Any]:
+        """Get current filter information for display."""
+        return {
+            "text": self.current_filter,
+            "mode": self.current_mode,
+            "mode_display": self.MODES.get(self.current_mode, "Unknown"),
+            "case_sensitive": self.case_sensitive,
+            "has_error": bool(self.last_error),
+            "error": self.last_error,
+            "is_active": bool(self.current_filter)
+        }
+    
+    def get_mode_names(self) -> List[str]:
+        """Get list of available filter mode names."""
+        return list(self.MODES.keys())
+    
+    def get_mode_display_names(self) -> List[str]:
+        """Get list of filter mode display names."""
+        return list(self.MODES.values())
+    
+    def clear_filter(self):
+        """Clear the current filter."""
+        self.current_filter = ""
+        self.compiled_regex = None
+        self.last_error = None
+
+
+class ConfigManager:
+    """Manages application configuration and user preferences."""
+    
+    DEFAULT_CONFIG = {
+        "window": {
+            "width": 1000,
+            "height": 1000,
+            "x": None,
+            "y": None,
+            "maximized": False
+        },
+        "theme": {
+            "current": "dark",
+            "auto_switch": False,
+            "auto_switch_time": "18:00"
+        },
+        "filter": {
+            "default_mode": "contains",
+            "case_sensitive": False,
+            "remember_history": True,
+            "max_history": 20
+        },
+        "display": {
+            "refresh_rate": 500,
+            "max_lines": 10000,
+            "auto_scroll": True,
+            "word_wrap": False,
+            "font_size": 11,
+            "font_family": None
+        },
+        "file": {
+            "last_directory": "",
+            "remember_encoding": True,
+            "auto_detect_encoding": True
+        },
+        "ui": {
+            "show_toolbar": True,
+            "show_status_bar": True,
+            "toolbar_position": "top",
+            "status_bar_position": "bottom"
+        }
+    }
+    
+    def __init__(self, config_dir: str = None):
+        if config_dir is None:
+            # Use proper Windows path handling
+            if sys.platform.startswith("win"):
+                config_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "LogViewer")
+            else:
+                config_dir = os.path.expanduser("~/.logviewer")
+        
+        self.config_dir = config_dir
+        self.config_file = os.path.join(config_dir, "config.json")
+        print(f"Debug: Config directory: {self.config_dir}")
+        print(f"Debug: Config file: {self.config_file}")
+        self.config = self.DEFAULT_CONFIG.copy()
+        self.load_config()
+    
+    def load_config(self):
+        """Load configuration from file."""
+        try:
+            print(f"Debug: Checking if config file exists: {self.config_file}")
+            if os.path.exists(self.config_file):
+                print(f"Debug: Loading config from: {self.config_file}")
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    loaded_config = json.load(f)
+                    print(f"Debug: Loaded config keys: {list(loaded_config.keys())}")
+                    # Merge with defaults to handle missing keys
+                    self._merge_config(loaded_config)
+                    print(f"Debug: Config merged successfully")
+            else:
+                print(f"Debug: Config file does not exist, using defaults")
+        except Exception as e:
+            print(f"Warning: Could not load config: {e}")
+            print(f"Debug: Error details: {type(e).__name__}: {e}")
+            # Keep default config
+    
+    def save_config(self):
+        """Save current configuration to file."""
+        try:
+            print(f"Debug: Creating config directory: {self.config_dir}")
+            os.makedirs(self.config_dir, exist_ok=True)
+            print(f"Debug: Writing config to: {self.config_file}")
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=2, ensure_ascii=False)
+            print(f"Debug: Config saved successfully to: {self.config_file}")
+            print(f"Debug: Config content preview: {list(self.config.keys())}")
+        except Exception as e:
+            print(f"Warning: Could not save config: {e}")
+            print(f"Debug: Error details: {type(e).__name__}: {e}")
+    
+    def _merge_config(self, loaded_config: Dict[str, Any]):
+        """Recursively merge loaded config with defaults."""
+        def _merge_dict(target: Dict[str, Any], source: Dict[str, Any]):
+            """Helper function to merge source into target recursively."""
+            for key, value in source.items():
+                if key in target and isinstance(value, dict) and isinstance(target[key], dict):
+                    # Recursively merge nested dictionaries
+                    _merge_dict(target[key], value)
+                else:
+                    # Direct value assignment (overwrites existing)
+                    target[key] = value
+        
+        # Start merging from the root level
+        _merge_dict(self.config, loaded_config)
+    
+    def get(self, key_path: str, default=None):
+        """Get configuration value using dot notation (e.g., 'window.width')."""
+        keys = key_path.split('.')
+        value = self.config
+        
+        try:
+            for key in keys:
+                value = value[key]
+            return value
+        except (KeyError, TypeError):
+            return default
+    
+    def set(self, key_path: str, value):
+        """Set configuration value using dot notation."""
+        keys = key_path.split('.')
+        config = self.config
+        
+        # Navigate to the parent of the target key
+        for key in keys[:-1]:
+            if key not in config:
+                config[key] = {}
+            config = config[key]
+        
+        # Set the value
+        config[keys[-1]] = value
+    
+    def get_window_geometry(self) -> str:
+        """Get window geometry string for Tkinter."""
+        width = self.get('window.width', 1000)
+        height = self.get('window.height', 1000)
+        x = self.get('window.x')
+        y = self.get('window.y')
+        
+        # Validate dimensions
+        width = max(800, min(width, 3000))  # Reasonable bounds
+        height = max(600, min(height, 2000))
+        
+        # On Windows, position might not work reliably, so we'll try both approaches
+        if x is not None and y is not None and sys.platform.startswith("win"):
+            # Try to center the window if position seems invalid
+            if x < 0 or y < 0 or x > 3000 or y > 2000:
+                x = None
+                y = None
+        
+        if x is not None and y is not None:
+            return f"{width}x{height}+{x}+{y}"
+        else:
+            return f"{width}x{height}"
+    
+    def save_window_state(self, window: tk.Tk):
+        """Save current window state and position."""
+        try:
+            # Get window geometry
+            geometry = window.geometry()
+            print(f"Debug: Parsing geometry string: '{geometry}'")
+            
+            # Parse geometry string - can be "WxH" or "WxH+X+Y"
+            if '+' in geometry:
+                # Format: "WxH+X+Y" (with position)
+                size_part, pos_part = geometry.split('+', 1)
+                width, height = size_part.split('x')
+                x, y = pos_part.split('+')
+                
+                print(f"Debug: Parsed - Width: {width}, Height: {height}, X: {x}, Y: {y}")
+                
+                self.set('window.width', int(width))
+                self.set('window.height', int(height))
+                self.set('window.x', int(x))
+                self.set('window.y', int(y))
+            else:
+                # Format: "WxH" (size only)
+                width, height = geometry.split('x')
+                print(f"Debug: Parsed - Width: {width}, Height: {height} (no position)")
+                
+                self.set('window.width', int(width))
+                self.set('window.height', int(height))
+                # Clear saved position
+                self.set('window.x', None)
+                self.set('window.y', None)
+            
+            # Check if maximized
+            try:
+                window_state = window.state()
+                print(f"Debug: Window state: {window_state}")
+                self.set('window.maximized', window_state == 'zoomed')
+            except Exception as e:
+                # Some platforms may not support state() method
+                print(f"Debug: Could not get window state: {e}")
+                self.set('window.maximized', False)
+            
+            print("Debug: Window state saved successfully")
+            
+        except Exception as e:
+            print(f"Warning: Could not save window state: {e}")
+            # Set safe defaults
+            self.set('window.width', 1000)
+            self.set('window.height', 1000)
+            self.set('window.x', None)
+            self.set('window.y', None)
+            self.set('window.maximized', False)
+    
+    def reset_to_defaults(self):
+        """Reset configuration to default values."""
+        self.config = self.DEFAULT_CONFIG.copy()
+        self.save_config()
+    
+    def export_config(self, filepath: str):
+        """Export configuration to a file."""
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            raise Exception(f"Could not export config: {e}")
+    
+    def import_config(self, filepath: str):
+        """Import configuration from a file."""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                loaded_config = json.load(f)
+                self._merge_config(loaded_config)
+                self.save_config()
+        except Exception as e:
+            raise Exception(f"Could not import config: {e}")
 
 
 class TailReader:
@@ -244,24 +619,54 @@ class TailReader:
 class LogViewerApp(tk.Tk):
     def __init__(self, path: Optional[str], refresh_ms: int = DEFAULT_REFRESH_MS, encoding: str = DEFAULT_ENCODING, theme: str = DEFAULT_THEME):
         super().__init__()
+        
+        # Initialize configuration manager first
+        self.config_manager = ConfigManager()
+        
         self.title("Log Viewer")
-        self.geometry("1000x640")
-        self.minsize(640, 360)
-
+        
+        # Get saved window geometry and apply it
+        saved_geometry = self.config_manager.get_window_geometry()
+        print(f"Debug: Applying saved geometry: '{saved_geometry}'")
+        self.geometry(saved_geometry)
+        
+        # Set minimum size after applying geometry
+        self.minsize(800, 600)
+        
+        # Restore maximized state if saved
+        if self.config_manager.get('window.maximized', False):
+            print(f"Debug: Restoring maximized state")
+            self.state('zoomed')
+        
+        # Force update to ensure geometry is applied
+        self.update_idletasks()
+        print(f"Debug: Final window geometry: '{self.geometry()}'")
+        
+        # Center window if no position was saved or if position is invalid
+        if not self.config_manager.get('window.x') or not self.config_manager.get('window.y'):
+            self._center_window()
+            print(f"Debug: Window centered on screen")
+        
         # Initialize theme manager with saved preference or command line argument
         self.theme_manager = ThemeManager(theme)  # Will be updated after UI is built
         
+        # Initialize filter manager
+        self.filter_manager = FilterManager()
+        
         self.path = path
         self.tail = TailReader(path, encoding=encoding) if path else None
-        self.refresh_ms = tk.IntVar(value=refresh_ms)
-        self.autoscroll = tk.BooleanVar(value=True)
-        self.wrap = tk.BooleanVar(value=False)
+        
+        # Load settings from config
+        self.refresh_ms = tk.IntVar(value=self.config_manager.get('display.refresh_rate', refresh_ms))
+        self.autoscroll = tk.BooleanVar(value=self.config_manager.get('display.auto_scroll', True))
+        self.wrap = tk.BooleanVar(value=self.config_manager.get('display.word_wrap', False))
         self.paused = tk.BooleanVar(value=False)
-        self.max_lines = tk.IntVar(value=MAX_LINES_DEFAULT)
+        self.max_lines = tk.IntVar(value=self.config_manager.get('display.max_lines', MAX_LINES_DEFAULT))
 
         # Filtering
         self.filter_text = tk.StringVar(value="")
         self.case_sensitive = tk.BooleanVar(value=False)
+        self.filter_mode = tk.StringVar(value="contains")
         self._filter_job = None  # debounce handle
 
         # Store raw lines so we can rebuild view when filter changes
@@ -278,10 +683,16 @@ class LogViewerApp(tk.Tk):
                 for name, var in self.theme_vars.items():
                     var.set(name == saved_theme)
         
+        # Load saved filter preferences
+        self._load_filter_preferences()
+        
         self._apply_theme()  # Apply initial theme
         if self.path:
             self._open_path(self.path, first_open=True)
         self.after(self.refresh_ms.get(), self._poll)
+        
+        # Bind window close event to save configuration
+        self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
     # UI
     def _build_ui(self):
@@ -315,8 +726,20 @@ class LogViewerApp(tk.Tk):
         
         menubar.add_cascade(label="View", menu=view_menu)
         
+        # Settings menu
+        settings_menu = tk.Menu(menubar, tearoff=0)
+        settings_menu.add_command(label="Preferences...", command=self._show_settings)
+        settings_menu.add_separator()
+        settings_menu.add_command(label="Save Current Settings as Default", command=self._save_as_default)
+        settings_menu.add_command(label="Reset to Defaults", command=self._reset_settings)
+        settings_menu.add_separator()
+        settings_menu.add_command(label="Export Settings...", command=self._export_settings)
+        settings_menu.add_command(label="Import Settings...", command=self._import_settings)
+        menubar.add_cascade(label="Settings", menu=settings_menu)
+        
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="Filter Help", command=self._show_filter_help)
         help_menu.add_command(label="Theme Info", command=self._show_theme_info)
         help_menu.add_command(label="Keyboard Shortcuts", command=self._show_keyboard_shortcuts)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -331,6 +754,11 @@ class LogViewerApp(tk.Tk):
         self.bind('<Control-W>', lambda e: self._toggle_wrap())
         self.bind('<Control-p>', lambda e: self._toggle_pause())
         self.bind('<Control-P>', lambda e: self._toggle_pause())
+        
+        # Filter-specific shortcuts
+        self.bind('<Escape>', lambda e: self._clear_filter())
+        self.bind('<Control-r>', lambda e: self._focus_filter())
+        self.bind('<Control-R>', lambda e: self._focus_filter())
 
         # Controls / toolbar
         toolbar = ttk.Frame(self, padding=(8, 4))
@@ -352,11 +780,55 @@ class LogViewerApp(tk.Tk):
         self.pause_btn.pack(side=tk.LEFT, padx=(8, 4))
         ttk.Button(toolbar, text="Clear", command=self._clear).pack(side=tk.LEFT)
 
+        # Enhanced Filter controls
+        filter_frame = ttk.Frame(toolbar)
+        filter_frame.pack(side=tk.LEFT, padx=(12, 4))
+        
+        # Filter mode dropdown
+        ttk.Label(filter_frame, text="Mode:").pack(side=tk.LEFT)
+        self.filter_mode_combo = ttk.Combobox(filter_frame, textvariable=self.filter_mode, 
+                                             values=self.filter_manager.get_mode_display_names(),
+                                             width=12, state="readonly")
+        self.filter_mode_combo.pack(side=tk.LEFT, padx=(4, 0))
+        
+        # Filter entry with history
+        ttk.Label(filter_frame, text="Filter:").pack(side=tk.LEFT, padx=(8, 4))
+        
+        # Filter entry frame for dropdown
+        filter_entry_frame = ttk.Frame(filter_frame)
+        filter_entry_frame.pack(side=tk.LEFT)
+        
+        self.filter_entry = ttk.Entry(filter_entry_frame, textvariable=self.filter_text, width=30)
+        self.filter_entry.pack(side=tk.LEFT)
+        
+        # Filter history dropdown
+        self.filter_history_btn = ttk.Button(filter_entry_frame, text="▼", width=2,
+                                           command=self._show_filter_history)
+        self.filter_history_btn.pack(side=tk.LEFT)
+        
         # Filter controls
-        ttk.Label(toolbar, text="Filter").pack(side=tk.LEFT, padx=(12, 4))
-        filt_entry = ttk.Entry(toolbar, textvariable=self.filter_text, width=24)
-        filt_entry.pack(side=tk.LEFT)
-        ttk.Checkbutton(toolbar, text="Case-sensitive", variable=self.case_sensitive, command=self._on_filter_change).pack(side=tk.LEFT, padx=(6, 0))
+        filter_controls_frame = ttk.Frame(filter_frame)
+        filter_controls_frame.pack(side=tk.LEFT, padx=(4, 0))
+        
+        # Case sensitive checkbox
+        self.case_sensitive_cb = ttk.Checkbutton(filter_controls_frame, text="Case", 
+                                                variable=self.case_sensitive, 
+                                                command=self._on_filter_change)
+        self.case_sensitive_cb.pack(side=tk.LEFT)
+        
+        # Clear filter button
+        self.clear_filter_btn = ttk.Button(filter_controls_frame, text="✕", width=3,
+                                         command=self._clear_filter)
+        self.clear_filter_btn.pack(side=tk.LEFT, padx=(4, 0))
+        
+        # Filter info button
+        self.filter_info_btn = ttk.Button(filter_controls_frame, text="ℹ", width=3,
+                                        command=self._show_filter_info)
+        self.filter_info_btn.pack(side=tk.LEFT, padx=(2, 0))
+        
+        # Filter status indicator
+        self.filter_status_label = ttk.Label(filter_controls_frame, text="", width=8)
+        self.filter_status_label.pack(side=tk.LEFT, padx=(4, 0))
         
         # Theme indicator (right side)
         theme_frame = ttk.Frame(toolbar)
@@ -369,8 +841,13 @@ class LogViewerApp(tk.Tk):
         self.theme_preview_btn = ttk.Button(theme_frame, text="🎨", width=3, command=self._show_theme_preview)
         self.theme_preview_btn.pack(side=tk.LEFT, padx=(4, 0))
         
-        # Rebuild when user types
+        # Bind filter events
         self.filter_text.trace_add('write', lambda *args: self._on_filter_change())
+        self.filter_mode_combo.bind('<<ComboboxSelected>>', self._on_filter_mode_change)
+        self.case_sensitive.trace_add('write', lambda *args: self._on_filter_change())
+        
+        # Set initial filter mode
+        self.filter_mode_combo.set(self.filter_manager.get_mode_display_names()[0])
 
         # Text area
         text_frame = ttk.Frame(self)
@@ -396,35 +873,437 @@ class LogViewerApp(tk.Tk):
         self.status = ttk.Label(self, relief=tk.SUNKEN, anchor=tk.W)
         self.status.pack(fill=tk.X)
 
-    # Filtering
+    # Enhanced Filtering
     def _on_filter_change(self):
-        # Debounce rapid typing; rebuild shortly after user stops
-        if self._filter_job is not None:
-            try:
-                self.after_cancel(self._filter_job)
-            except Exception:
+        """Handle filter text or case sensitivity changes."""
+        # Update filter manager
+        mode_index = self.filter_mode_combo.current()
+        mode_name = self.filter_manager.get_mode_names()[mode_index]
+        
+        if self.filter_manager.set_filter(
+            self.filter_text.get(), 
+            mode_name, 
+            self.case_sensitive.get()
+        ):
+            # Update filter status indicator
+            self._update_filter_status()
+            
+            # Debounce rapid typing; rebuild shortly after user stops
+            if self._filter_job is not None:
+                try:
+                    self.after_cancel(self._filter_job)
+                except Exception:
+                    pass
+            self._filter_job = self.after(150, self._rebuild_view)
+    
+    def _update_filter_status(self):
+        """Update the filter status indicator."""
+        info = self.filter_manager.get_filter_info()
+        
+        if info["is_active"]:
+            if info["has_error"]:
+                self.filter_status_label.config(text="❌ Error", foreground="red")
+            else:
+                self.filter_status_label.config(text="✅ Active", foreground="green")
+        else:
+            self.filter_status_label.config(text="", foreground="black")
+    
+    def _on_filter_mode_change(self, event=None):
+        """Handle filter mode changes."""
+        self._on_filter_change()
+    
+    def _clear_filter(self):
+        """Clear the current filter."""
+        self.filter_text.set("")
+        self.filter_manager.clear_filter()
+        self._rebuild_view()
+        self._set_status("Filter cleared")
+    
+    def _show_settings(self):
+        """Show the settings/preferences dialog."""
+        settings_window = tk.Toplevel(self)
+        settings_window.title("Log Viewer Settings")
+        settings_window.geometry("600x700")
+        settings_window.resizable(True, True)
+        settings_window.transient(self)
+        settings_window.grab_set()
+        
+        # Center the window
+        settings_window.geometry("+%d+%d" % (self.winfo_rootx() + 100, self.winfo_rooty() + 100))
+        
+        # Create notebook for tabs
+        notebook = ttk.Notebook(settings_window)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # General tab
+        general_frame = ttk.Frame(notebook)
+        notebook.add(general_frame, text="General")
+        self._create_general_settings_tab(general_frame)
+        
+        # Display tab
+        display_frame = ttk.Frame(notebook)
+        notebook.add(display_frame, text="Display")
+        self._create_display_settings_tab(display_frame)
+        
+        # Filter tab
+        filter_frame = ttk.Frame(notebook)
+        notebook.add(filter_frame, text="Filtering")
+        self._create_filter_settings_tab(filter_frame)
+        
+        # Theme tab
+        theme_frame = ttk.Frame(notebook)
+        notebook.add(theme_frame, text="Theme")
+        self._create_theme_settings_tab(theme_frame)
+        
+        # Buttons
+        button_frame = ttk.Frame(settings_window)
+        button_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Button(button_frame, text="OK", command=lambda: self._save_settings_and_close(settings_window)).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=settings_window.destroy).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(button_frame, text="Apply", command=self._apply_settings).pack(side=tk.RIGHT, padx=5)
+    
+    def _create_general_settings_tab(self, parent):
+        """Create the general settings tab."""
+        # Window settings
+        window_frame = ttk.LabelFrame(parent, text="Window", padding=10)
+        window_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # Window size
+        ttk.Label(window_frame, text="Default Window Size:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        
+        size_frame = ttk.Frame(window_frame)
+        size_frame.grid(row=0, column=1, sticky=tk.W, pady=2)
+        
+        self.settings_width = tk.StringVar(value=str(self.config_manager.get('window.width', 1000)))
+        self.settings_height = tk.StringVar(value=str(self.config_manager.get('window.height', 1000)))
+        
+        ttk.Label(size_frame, text="Width:").pack(side=tk.LEFT)
+        ttk.Entry(size_frame, textvariable=self.settings_width, width=8).pack(side=tk.LEFT, padx=5)
+        ttk.Label(size_frame, text="Height:").pack(side=tk.LEFT, padx=5)
+        ttk.Entry(size_frame, textvariable=self.settings_height, width=8).pack(side=tk.LEFT, padx=5)
+        
+        # Remember window position
+        self.settings_remember_pos = tk.BooleanVar(value=self.config_manager.get('window.x') is not None)
+        ttk.Checkbutton(window_frame, text="Remember window position", variable=self.settings_remember_pos).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
+        
+        # File settings
+        file_frame = ttk.LabelFrame(parent, text="File Handling", padding=10)
+        file_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        self.settings_remember_dir = tk.BooleanVar(value=self.config_manager.get('file.remember_encoding', True))
+        ttk.Checkbutton(file_frame, text="Remember last directory", variable=self.settings_remember_dir).grid(row=0, column=0, sticky=tk.W, pady=2)
+        
+        self.settings_auto_encoding = tk.BooleanVar(value=self.config_manager.get('file.auto_detect_encoding', True))
+        ttk.Checkbutton(file_frame, text="Auto-detect file encoding", variable=self.settings_auto_encoding).grid(row=1, column=0, sticky=tk.W, pady=2)
+    
+    def _create_display_settings_tab(self, parent):
+        """Create the display settings tab."""
+        # Refresh settings
+        refresh_frame = ttk.LabelFrame(parent, text="Refresh & Performance", padding=10)
+        refresh_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        ttk.Label(refresh_frame, text="Default Refresh Rate (ms):").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.settings_refresh_rate = tk.StringVar(value=str(self.config_manager.get('display.refresh_rate', 500)))
+        ttk.Entry(refresh_frame, textvariable=self.settings_refresh_rate, width=10).grid(row=0, column=1, sticky=tk.W, pady=2)
+        
+        ttk.Label(refresh_frame, text="Default Max Lines:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        self.settings_max_lines = tk.StringVar(value=str(self.config_manager.get('display.max_lines', 10000)))
+        ttk.Entry(refresh_frame, textvariable=self.settings_max_lines, width=10).grid(row=1, column=1, sticky=tk.W, pady=2)
+        
+        # Display options
+        display_frame = ttk.LabelFrame(parent, text="Display Options", padding=10)
+        display_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        self.settings_auto_scroll = tk.BooleanVar(value=self.config_manager.get('display.auto_scroll', True))
+        ttk.Checkbutton(display_frame, text="Auto-scroll by default", variable=self.settings_auto_scroll).grid(row=0, column=0, sticky=tk.W, pady=2)
+        
+        self.settings_word_wrap = tk.BooleanVar(value=self.config_manager.get('display.word_wrap', False))
+        ttk.Checkbutton(display_frame, text="Word wrap by default", variable=self.settings_word_wrap).grid(row=1, column=0, sticky=tk.W, pady=2)
+        
+        # Font settings
+        font_frame = ttk.LabelFrame(parent, text="Font", padding=10)
+        font_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        ttk.Label(font_frame, text="Font Size:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.settings_font_size = tk.StringVar(value=str(self.config_manager.get('display.font_size', 11)))
+        ttk.Entry(font_frame, textvariable=self.settings_font_size, width=8).grid(row=0, column=1, sticky=tk.W, pady=2)
+    
+    def _create_filter_settings_tab(self, parent):
+        """Create the filter settings tab."""
+        filter_frame = ttk.LabelFrame(parent, text="Filter Preferences", padding=10)
+        filter_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # Default filter mode
+        ttk.Label(filter_frame, text="Default Filter Mode:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.settings_filter_mode = tk.StringVar(value=self.config_manager.get('filter.default_mode', 'contains'))
+        filter_mode_combo = ttk.Combobox(filter_frame, textvariable=self.settings_filter_mode, 
+                                        values=self.filter_manager.get_mode_display_names(), state="readonly")
+        filter_mode_combo.grid(row=0, column=1, sticky=tk.W, pady=2)
+        
+        # Filter options
+        self.settings_case_sensitive = tk.BooleanVar(value=self.config_manager.get('filter.case_sensitive', False))
+        ttk.Checkbutton(filter_frame, text="Case sensitive by default", variable=self.settings_case_sensitive).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
+        
+        self.settings_remember_history = tk.BooleanVar(value=self.config_manager.get('filter.remember_history', True))
+        ttk.Checkbutton(filter_frame, text="Remember filter history", variable=self.settings_remember_history).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=2)
+        
+        ttk.Label(filter_frame, text="Max History Items:").grid(row=3, column=0, sticky=tk.W, pady=2)
+        self.settings_max_history = tk.StringVar(value=str(self.config_manager.get('filter.max_history', 20)))
+        ttk.Entry(filter_frame, textvariable=self.settings_max_history, width=8).grid(row=3, column=1, sticky=tk.W, pady=2)
+    
+    def _create_theme_settings_tab(self, parent):
+        """Create the theme settings tab."""
+        theme_frame = ttk.LabelFrame(parent, text="Theme Preferences", padding=10)
+        theme_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # Default theme
+        ttk.Label(theme_frame, text="Default Theme:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.settings_default_theme = tk.StringVar(value=self.config_manager.get('theme.current', 'dark'))
+        theme_combo = ttk.Combobox(theme_frame, textvariable=self.settings_default_theme, 
+                                  values=self.theme_manager.get_theme_names(), state="readonly")
+        theme_combo.grid(row=0, column=1, sticky=tk.W, pady=2)
+        
+        # Auto-switch theme
+        self.settings_auto_switch_theme = tk.BooleanVar(value=self.config_manager.get('theme.auto_switch', False))
+        ttk.Checkbutton(theme_frame, text="Auto-switch theme based on time", variable=self.settings_auto_switch_theme).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
+        
+        ttk.Label(theme_frame, text="Switch Time (HH:MM):").grid(row=2, column=0, sticky=tk.W, pady=2)
+        self.settings_switch_time = tk.StringVar(value=self.config_manager.get('theme.auto_switch_time', '18:00'))
+        ttk.Entry(theme_frame, textvariable=self.settings_switch_time, width=10).grid(row=2, column=1, sticky=tk.W, pady=2)
+    
+    def _apply_settings(self):
+        """Apply current settings without closing the dialog."""
+        try:
+            # Save window settings
+            self.config_manager.set('window.width', int(self.settings_width.get()))
+            self.config_manager.set('window.height', int(self.settings_height.get()))
+            
+            if self.settings_remember_pos.get():
+                # Keep current position
                 pass
-        self._filter_job = self.after(150, self._rebuild_view)
-
-    def _matches(self, line: str) -> bool:
-        needle = self.filter_text.get()
-        if not needle:
-            return True
-        if self.case_sensitive.get():
-            return needle in line
-        return needle.lower() in line.lower()
-
+            else:
+                # Clear saved position
+                self.config_manager.set('window.x', None)
+                self.config_manager.set('window.y', None)
+            
+            # Save file settings
+            self.config_manager.set('file.remember_encoding', self.settings_remember_dir.get())
+            self.config_manager.set('file.auto_detect_encoding', self.settings_auto_encoding.get())
+            
+            # Save display settings
+            self.config_manager.set('display.refresh_rate', int(self.settings_refresh_rate.get()))
+            self.config_manager.set('display.max_lines', int(self.settings_max_lines.get()))
+            self.config_manager.set('display.auto_scroll', self.settings_auto_scroll.get())
+            self.config_manager.set('display.word_wrap', self.settings_word_wrap.get())
+            self.config_manager.set('display.font_size', int(self.settings_font_size.get()))
+            
+            # Save filter settings
+            mode_index = self.filter_manager.get_mode_names().index(self.settings_filter_mode.get())
+            self.config_manager.set('filter.default_mode', self.filter_manager.get_mode_names()[mode_index])
+            self.config_manager.set('filter.case_sensitive', self.settings_case_sensitive.get())
+            self.config_manager.set('filter.remember_history', self.settings_remember_history.get())
+            self.config_manager.set('filter.max_history', int(self.settings_max_history.get()))
+            
+            # Save theme settings
+            self.config_manager.set('theme.current', self.settings_default_theme.get())
+            self.config_manager.set('theme.auto_switch', self.settings_auto_switch_theme.get())
+            self.config_manager.set('theme.auto_switch_time', self.settings_switch_time.get())
+            
+            # Save to file
+            self.config_manager.save_config()
+            
+            # Apply some settings immediately
+            self._apply_current_settings()
+            
+            self._set_status("Settings applied successfully")
+            
+        except ValueError as e:
+            messagebox.showerror("Error", f"Invalid value: {e}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply settings: {e}")
+    
+    def _save_settings_and_close(self, window):
+        """Save settings and close the dialog."""
+        self._apply_settings()
+        window.destroy()
+    
+    def _apply_current_settings(self):
+        """Apply current configuration to the running application."""
+        # Update font size if changed
+        font_size = self.config_manager.get('display.font_size', 11)
+        font_family = self.config_manager.get('display.font_family')
+        if font_family:
+            self.text.configure(font=(font_family, font_size))
+        else:
+            # Use platform default font
+            font_family = "Consolas" if sys.platform.startswith("win") else "Menlo"
+            self.text.configure(font=(font_family, font_size))
+    
+    def _save_as_default(self):
+        """Save current application state as default settings."""
+        try:
+            # Save current window state
+            self.config_manager.save_window_state(self)
+            
+            # Save current display settings
+            self.config_manager.set('display.refresh_rate', self.refresh_ms.get())
+            self.config_manager.set('display.max_lines', self.max_lines.get())
+            self.config_manager.set('display.auto_scroll', self.autoscroll.get())
+            self.config_manager.set('display.word_wrap', self.wrap.get())
+            
+            # Save current filter settings
+            mode_index = self.filter_mode_combo.current()
+            if mode_index >= 0:
+                mode_name = self.filter_manager.get_mode_names()[mode_index]
+                self.config_manager.set('filter.default_mode', mode_name)
+            self.config_manager.set('filter.case_sensitive', self.case_sensitive.get())
+            
+            # Save current theme
+            self.config_manager.set('theme.current', self.theme_manager.current_theme)
+            
+            # Save to file
+            self.config_manager.save_config()
+            
+            self._set_status("Current settings saved as default")
+            messagebox.showinfo("Success", "Current settings have been saved as your new defaults!")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save settings: {e}")
+    
+    def _reset_settings(self):
+        """Reset all settings to default values."""
+        if messagebox.askyesno("Reset Settings", 
+                              "Are you sure you want to reset all settings to default values?\n\nThis cannot be undone."):
+            self.config_manager.reset_to_defaults()
+            self._set_status("Settings reset to defaults")
+            messagebox.showinfo("Reset Complete", "All settings have been reset to default values.\n\nRestart the application to apply the changes.")
+    
+    def _export_settings(self):
+        """Export current settings to a file."""
+        filepath = filedialog.asksaveasfilename(
+            title="Export Settings",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        if filepath:
+            try:
+                self.config_manager.export_config(filepath)
+                self._set_status(f"Settings exported to {os.path.basename(filepath)}")
+                messagebox.showinfo("Export Success", f"Settings exported successfully to:\n{filepath}")
+            except Exception as e:
+                messagebox.showerror("Export Error", f"Failed to export settings: {e}")
+    
+    def _import_settings(self):
+        """Import settings from a file."""
+        filepath = filedialog.askopenfilename(
+            title="Import Settings",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        if filepath:
+            try:
+                self.config_manager.import_config(filepath)
+                self._set_status(f"Settings imported from {os.path.basename(filepath)}")
+                messagebox.showinfo("Import Success", f"Settings imported successfully from:\n{filepath}\n\nRestart the application to apply the changes.")
+            except Exception as e:
+                messagebox.showerror("Import Error", f"Failed to import settings: {e}")
+    
+    def _on_closing(self):
+        """Handle application closing - save configuration."""
+        try:
+            # Save current window state
+            self.config_manager.save_window_state(self)
+            
+            # Save current settings
+            self.config_manager.set('display.refresh_rate', self.refresh_ms.get())
+            self.config_manager.set('display.max_lines', self.max_lines.get())
+            self.config_manager.set('display.auto_scroll', self.autoscroll.get())
+            self.config_manager.set('display.word_wrap', self.wrap.get())
+            
+            # Save current filter settings
+            mode_index = self.filter_mode_combo.current()
+            if mode_index >= 0:
+                mode_name = self.filter_manager.get_mode_names()[mode_index]
+                self.config_manager.set('filter.default_mode', mode_name)
+            self.config_manager.set('filter.case_sensitive', self.case_sensitive.get())
+            
+            # Save current theme
+            self.config_manager.set('theme.current', self.theme_manager.current_theme)
+            
+            # Save configuration
+            self.config_manager.save_config()
+            
+        except Exception as e:
+            print(f"Warning: Could not save configuration: {e}")
+        
+        # Destroy the window
+        self.destroy()
+    
+    def _show_filter_info(self):
+        """Show detailed information about the current filter."""
+        info = self.filter_manager.get_filter_info()
+        
+        if info["is_active"]:
+            status_text = f"Active Filter: {info['mode_display']}"
+            if info["has_error"]:
+                status_text += f" (Error: {info['error']})"
+            self._set_status(status_text)
+        else:
+            self._set_status("No active filter")
+    
+    def _show_filter_history(self):
+        """Show filter history in a popup menu."""
+        if not self.filter_manager.filter_history:
+            self._set_status("No filter history")
+            return
+        
+        # Create popup menu
+        history_menu = tk.Menu(self, tearoff=0)
+        
+        for i, filter_text in enumerate(self.filter_manager.filter_history):
+            # Truncate long filter text for display
+            display_text = filter_text[:50] + "..." if len(filter_text) > 50 else filter_text
+            history_menu.add_command(
+                label=f"{i+1}. {display_text}",
+                command=lambda text=filter_text: self._use_filter_from_history(text)
+            )
+        
+        # Show menu below the history button
+        x = self.filter_history_btn.winfo_rootx()
+        y = self.filter_history_btn.winfo_rooty() + self.filter_history_btn.winfo_height()
+        history_menu.post(x, y)
+    
+    def _use_filter_from_history(self, filter_text: str):
+        """Use a filter from history."""
+        self.filter_text.set(filter_text)
+        self._on_filter_change()
+        self._set_status(f"Using filter from history: {filter_text[:30]}...")
+    
     def _rebuild_view(self):
-        # Re-render the text widget from the buffered lines using the current filter
+        """Re-render the text widget from the buffered lines using the current filter."""
         try:
             self.text.delete('1.0', tk.END)
             at_end = True
+            matched_count = 0
+            total_count = len(self._line_buffer)
+            
             for line in self._line_buffer:
-                if self._matches(line):
+                if self.filter_manager.matches(line):
                     self.text.insert(tk.END, line)
+                    matched_count += 1
+            
             if self.autoscroll.get() and at_end:
                 self.text.see(tk.END)
-            self._set_status("Filtered")
+            
+            # Update status with filter information
+            if self.filter_manager.current_filter:
+                if self.filter_manager.last_error:
+                    self._set_status(f"Filter error: {self.filter_manager.last_error}")
+                else:
+                    self._set_status(f"Filtered: {matched_count}/{total_count} lines")
+            else:
+                self._set_status(f"Showing all {total_count} lines")
+                
         except Exception as e:
             self._set_status("Filter error: {}".format(e))
 
@@ -550,6 +1429,41 @@ class LogViewerApp(tk.Tk):
         
         # Save theme preference
         self._save_theme_preference()
+        
+        # Save filter preferences
+        self._save_filter_preferences()
+    
+    def _save_filter_preferences(self):
+        """Save current filter preferences to config file."""
+        try:
+            config_dir = os.path.expanduser("~/.logviewer")
+            os.makedirs(config_dir, exist_ok=True)
+            config_file = os.path.join(config_dir, "filter_prefs.txt")
+            
+            with open(config_file, 'w') as f:
+                f.write(f"mode:{self.filter_mode.get()}\n")
+                f.write(f"case_sensitive:{self.case_sensitive.get()}\n")
+                f.write(f"filter_text:{self.filter_text.get()}\n")
+        except Exception:
+            pass  # Silently fail if we can't save preferences
+    
+    def _load_filter_preferences(self):
+        """Load saved filter preferences. Returns default if none saved."""
+        try:
+            config_file = os.path.join(os.path.expanduser("~/.logviewer"), "filter_prefs.txt")
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    for line in f:
+                        if ':' in line:
+                            key, value = line.strip().split(':', 1)
+                            if key == 'mode' and value in self.filter_manager.get_mode_names():
+                                self.filter_mode.set(value)
+                            elif key == 'case_sensitive':
+                                self.case_sensitive.set(value.lower() == 'true')
+                            elif key == 'filter_text':
+                                self.filter_text.set(value)
+        except Exception:
+            pass
     
     def _save_theme_preference(self):
         """Save current theme preference to a simple config file."""
@@ -601,10 +1515,44 @@ class LogViewerApp(tk.Tk):
         shortcuts += "Ctrl+O    - Open file\n"
         shortcuts += "Ctrl+T    - Cycle themes\n"
         shortcuts += "Ctrl+F    - Focus filter box\n"
+        shortcuts += "Ctrl+R    - Focus filter box\n"
         shortcuts += "Ctrl+W    - Toggle word wrap\n"
         shortcuts += "Ctrl+P    - Toggle pause/resume\n"
+        shortcuts += "Escape     - Clear filter\n"
         
         messagebox.showinfo("Keyboard Shortcuts", shortcuts)
+    
+    def _show_filter_help(self):
+        """Show help information for the filtering system."""
+        help_text = """Advanced Filtering System
+
+Filter Modes:
+• Contains: Text appears anywhere in the line
+• Starts With: Line begins with the text
+• Ends With: Line ends with the text
+• Regular Expression: Use regex patterns
+• Exact Match: Line exactly matches the text
+• Not Contains: Line does NOT contain the text
+
+Regular Expression Examples:
+• ^ERROR - Lines starting with "ERROR"
+• \\d{4}-\\d{2}-\\d{2} - Date pattern (YYYY-MM-DD)
+• (ERROR|WARN) - Lines with ERROR or WARN
+• .*exception.* - Lines containing "exception"
+
+Keyboard Shortcuts:
+• Ctrl+F - Focus filter box
+• Ctrl+R - Focus filter box
+• Escape - Clear filter
+• Enter - Apply filter
+
+Tips:
+• Use regex mode for complex patterns
+• Filter history remembers your searches
+• Case sensitivity affects all modes
+• Invalid regex shows error indicator"""
+        
+        messagebox.showinfo("Filter Help", help_text)
     
     def _show_theme_preview(self):
         """Show a preview of all available themes."""
@@ -667,15 +1615,8 @@ class LogViewerApp(tk.Tk):
     
     def _focus_filter(self):
         """Focus the filter entry box."""
-        # Find the filter entry widget and focus it
-        for child in self.winfo_children():
-            if isinstance(child, ttk.Frame):  # Toolbar
-                for toolbar_child in child.winfo_children():
-                    if isinstance(toolbar_child, ttk.Entry):
-                        toolbar_child.focus_set()
-                        toolbar_child.select_range(0, tk.END)
-                        break
-                break
+        self.filter_entry.focus_set()
+        self.filter_entry.select_range(0, tk.END)
 
     def _set_status(self, msg: str):
         now = time.strftime("%H:%M:%S")
@@ -700,6 +1641,7 @@ class LogViewerApp(tk.Tk):
             self.text.delete('1.0', "{}.0".format(cutoff))
 
     def _append(self, s: str):
+        """Append new text to the display, applying current filter."""
         # Break incoming chunk into lines, store, and append only matching ones
         lines = s.splitlines(True)  # keep line endings
         if not lines:
@@ -708,9 +1650,12 @@ class LogViewerApp(tk.Tk):
         self._line_buffer.extend(lines)
         # Dynamic buffer size based on Max lines control
         self._buffer_trim()
+        
+        # Apply current filter to new lines
         for line in lines:
-            if self._matches(line):
+            if self.filter_manager.matches(line):
                 self.text.insert(tk.END, line)
+        
         self._trim_if_needed()
         if self.autoscroll.get() and (at_end or self.paused.get() is False):
             self.text.see(tk.END)
@@ -732,6 +1677,18 @@ class LogViewerApp(tk.Tk):
             except Exception:
                 interval = DEFAULT_REFRESH_MS
             self.after(interval, self._poll)
+
+    def _center_window(self):
+        """Centers the window on the screen."""
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        window_width = self.winfo_reqwidth()
+        window_height = self.winfo_reqheight()
+        
+        x = int((screen_width - window_width) / 2)
+        y = int((screen_height - window_height) / 2)
+        
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
 
 def main():

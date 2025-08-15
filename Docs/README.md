@@ -34,10 +34,11 @@ python FileUpdater.py --theme sunset
 
 - **Real-time monitoring** with configurable refresh rates (100ms - 5000ms)
 - **Smart file handling** - automatically detects file rotation and truncation
-- **Live filtering** with case-sensitive toggle
+- **Advanced filtering** with 6 modes (Contains, Starts With, Ends With, Regex, Exact Match, Not Contains)
 - **Auto-encoding detection** for UTF-8, UTF-16, and other formats
 - **Memory efficient** - limits displayed lines to prevent memory issues
 - **Multiple color themes** (Dark, Light, Sunset) with easy switching
+- **Comprehensive configuration system** with persistent user preferences
 - **Cross-platform** support (Windows, macOS, Linux)
 
 ## 📁 File Structure

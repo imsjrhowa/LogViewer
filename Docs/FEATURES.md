@@ -33,11 +33,14 @@ Comprehensive documentation of all current features and planned improvements for
 - **Pause/Resume button** for stopping/starting updates
 - **Clear button** for clearing display
 
-#### Filtering System
-- **Live text filtering** with real-time updates
+#### Enhanced Filtering System
+- **Six filter modes**: Contains, Starts With, Ends With, Regex, Exact Match, Not Contains
+- **Regular expression support** with syntax validation and error handling
 - **Case-sensitive toggle** for precise matching
+- **Filter history** with dropdown access (last 20 filters)
 - **Debounced input** (150ms delay) for performance
-- **Substring matching** (not regex-based)
+- **Visual status indicators** showing filter state and errors
+- **Filter preferences persistence** across sessions
 
 #### Text Display
 - **Monospaced font** (Consolas on Windows, Menlo on macOS)
@@ -127,7 +130,7 @@ Comprehensive documentation of all current features and planned improvements for
 #### Search and Replace
 - **Find functionality** with navigation
 - **Replace operations** (single/all occurrences)
-- **Regular expression** support
+- **Regular expression** support (building on existing regex engine)
 - **Search history** and bookmarks
 - **Highlighted search results**
 

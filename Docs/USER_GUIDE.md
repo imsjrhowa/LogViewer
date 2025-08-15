@@ -48,6 +48,12 @@ Complete guide to using the Log Viewer application for monitoring log files in r
 - **Sunset theme** - Warm purple and cream colors for a unique look
 - **Theme persistence** - Your choice is remembered between sessions
 
+### Configuration & Settings
+- **Settings → Preferences...** for comprehensive configuration
+- **Save Current Settings as Default** to make current setup permanent
+- **Export/Import Settings** for backup and sharing configurations
+- **Automatic saving** of window size, position, and preferences
+
 ### Refresh Settings
 - **Refresh Rate:** Adjust from 100ms (fast) to 5000ms (slow)
   - Lower values = more responsive but higher CPU usage
@@ -62,15 +68,35 @@ Complete guide to using the Log Viewer application for monitoring log files in r
 
 ## 🔍 Advanced Features
 
-### Live Filtering
-1. **Enter text** in the Filter box
-2. **Results update automatically** as you type
-3. **Toggle case sensitivity** with the checkbox
-4. **Filter is applied** to all displayed content
+### Advanced Filtering
+The Log Viewer includes a powerful filtering system with multiple modes:
+
+#### Filter Modes
+- **Contains** - Text appears anywhere in the line (default)
+- **Starts With** - Line begins with the specified text
+- **Ends With** - Line ends with the specified text
+- **Regular Expression** - Use regex patterns for complex matching
+- **Exact Match** - Line exactly matches the filter text
+- **Not Contains** - Line does NOT contain the specified text
+
+#### Using Filters
+1. **Select mode** from the Mode dropdown
+2. **Enter text** in the Filter box
+3. **Toggle case sensitivity** with the Case checkbox
+4. **Results update automatically** as you type
+5. **Use filter history** with the ▼ button
+
+#### Regular Expression Examples
+- `^ERROR` - Lines starting with "ERROR"
+- `\d{4}-\d{2}-\d{2}` - Date pattern (YYYY-MM-DD)
+- `(ERROR|WARN)` - Lines with ERROR or WARN
+- `.*exception.*` - Lines containing "exception"
 
 **Filter Tips:**
-- Use partial words or phrases
-- Combine with case sensitivity for precise matching
+- Use regex mode for complex patterns
+- Filter history remembers your searches
+- Case sensitivity affects all modes
+- Invalid regex shows error indicator
 - Filter updates in real-time with 150ms debouncing
 
 ### Encoding Detection
@@ -165,9 +191,17 @@ The Log Viewer includes three beautiful color themes:
 ### Keyboard Shortcuts
 - **Ctrl+O:** Open file dialog
 - **Ctrl+F:** Focus filter box
+- **Ctrl+R:** Focus filter box (alternative)
 - **Ctrl+W:** Toggle word wrap
 - **Ctrl+P:** Toggle pause/resume
 - **Ctrl+T:** Cycle through themes
+- **Escape:** Clear current filter
+
+### Settings Management
+- **Settings → Preferences...** - Open configuration dialog
+- **Settings → Save Current Settings as Default** - Save current state
+- **Settings → Reset to Defaults** - Restore factory settings
+- **Settings → Export/Import Settings** - Backup and restore configurations
 
 ## 📱 Platform-Specific Notes
 

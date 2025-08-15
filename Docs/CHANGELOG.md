@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Real-time log monitoring** with configurable refresh rates
-- **Live text filtering** with case-sensitive toggle
+- **Advanced filtering system** with 6 modes including regex support
 - **Automatic encoding detection** for UTF-8, UTF-16, and other formats
 - **File rotation and truncation detection** with automatic recovery
 - **Memory-efficient line buffering** with configurable limits
@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Error resilience** with graceful fallbacks
 - **Memory management** with bounded collections.deque
 - **Debounced filtering** for performance optimization
+- **Advanced filter management** with regex compilation and validation
 - **Theme management system** with persistent preferences
 
 ### User Interface
