@@ -906,6 +906,9 @@ class LogViewerApp(tk.Tk):
         # Bind events for line numbers
         self.text.bind('<KeyRelease>', self._update_line_numbers)
         self.text.bind('<ButtonRelease-1>', self._update_line_numbers)
+        self.text.bind('<MouseWheel>', self._on_mouse_wheel)  # Windows mouse wheel
+        self.text.bind('<Button-4>', self._on_mouse_wheel)    # Linux scroll up
+        self.text.bind('<Button-5>', self._on_mouse_wheel)    # Linux scroll down
         self.show_line_numbers.trace_add('write', lambda *args: self._toggle_line_numbers())
         
         # Bind scrollbar to update line numbers
@@ -1803,13 +1806,43 @@ Tips:
     def _sync_scroll(self):
         """Synchronize scroll position between text and line numbers."""
         try:
+            # Only sync if line numbers are visible
+            if not self.show_line_numbers.get():
+                return
+                
             # Get current scroll position
             first, last = self.text.yview()
             
+            # Validate scroll values
+            if first is None or last is None or first < 0 or last > 1:
+                return
+                
             # Apply same scroll position to line numbers
             self.line_numbers.yview_moveto(first)
+            
         except Exception:
             pass
+
+    def _on_mouse_wheel(self, event):
+        """Handle mouse wheel events to scroll the text widget."""
+        # Cancel any pending scroll sync
+        if hasattr(self, '_wheel_sync_job'):
+            try:
+                self.after_cancel(self._wheel_sync_job)
+            except Exception:
+                pass
+        
+        # Handle different mouse wheel events
+        if event.num == 4:  # Linux scroll up
+            self.text.yview_scroll(-1, "units")
+        elif event.num == 5:  # Linux scroll down
+            self.text.yview_scroll(1, "units")
+        else:  # Windows mouse wheel
+            self.text.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        # Schedule line number update after a short delay to ensure scroll completes
+        # Use debouncing to prevent rapid updates during fast scrolling
+        self._wheel_sync_job = self.after(20, self._sync_scroll)
 
 
 def main():
