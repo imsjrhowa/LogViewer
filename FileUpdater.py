@@ -307,7 +307,8 @@ class ConfigManager:
             "auto_scroll": True,
             "word_wrap": False,
             "font_size": 11,
-            "font_family": None
+            "font_family": None,
+            "show_line_numbers": True
         },
         "file": {
             "last_directory": "",
@@ -660,6 +661,7 @@ class LogViewerApp(tk.Tk):
         self.refresh_ms = tk.IntVar(value=self.config_manager.get('display.refresh_rate', refresh_ms))
         self.autoscroll = tk.BooleanVar(value=self.config_manager.get('display.auto_scroll', True))
         self.wrap = tk.BooleanVar(value=self.config_manager.get('display.word_wrap', False))
+        self.show_line_numbers = tk.BooleanVar(value=self.config_manager.get('display.show_line_numbers', True))
         self.paused = tk.BooleanVar(value=False)
         self.max_lines = tk.IntVar(value=self.config_manager.get('display.max_lines', MAX_LINES_DEFAULT))
 
@@ -776,6 +778,7 @@ class LogViewerApp(tk.Tk):
 
         ttk.Checkbutton(toolbar, text="Auto-scroll", variable=self.autoscroll).pack(side=tk.LEFT)
         ttk.Checkbutton(toolbar, text="Wrap", variable=self.wrap, command=self._apply_wrap).pack(side=tk.LEFT, padx=(8, 8))
+        ttk.Checkbutton(toolbar, text="Line Numbers", variable=self.show_line_numbers, command=self._toggle_line_numbers).pack(side=tk.LEFT, padx=(8, 8))
         ttk.Label(toolbar, text="Max lines").pack(side=tk.LEFT)
         ttk.Spinbox(toolbar, from_=1000, to=200000, increment=1000, textvariable=self.max_lines, width=7).pack(side=tk.LEFT, padx=(4, 8))
 
@@ -852,25 +855,61 @@ class LogViewerApp(tk.Tk):
         # Set initial filter mode
         self.filter_mode_combo.set(self.filter_manager.get_mode_display_names()[0])
 
-        # Text area
+        # Text area with line numbers support
         text_frame = ttk.Frame(self)
         text_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Choose a monospaced font per platform
-        font_family = "Consolas" if sys.platform.startswith("win") else "Menlo"
+        # Create a frame for text and line numbers
+        text_content_frame = ttk.Frame(text_frame)
+        text_content_frame.pack(fill=tk.BOTH, expand=True)
 
+        # Line numbers widget
+        self.line_numbers = tk.Text(
+            text_content_frame,
+            width=8,
+            padx=3,
+            pady=2,
+            relief=tk.FLAT,
+            borderwidth=0,
+            state=tk.DISABLED,
+            font=("Consolas", 11),
+            background="#f0f0f0",
+            foreground="#666666"
+        )
+        
+        # Main text widget
         self.text = tk.Text(
-            text_frame,
+            text_content_frame,
             wrap=tk.WORD if self.wrap.get() else tk.NONE,
             undo=False,
-            font=(font_family, 11)
+            font=("Consolas", 11)
         )
 
-        yscroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.text.yview)
-        self.text.configure(yscrollcommand=yscroll.set)
+        # Scrollbars
+        yscroll = ttk.Scrollbar(text_content_frame, orient=tk.VERTICAL, command=self.text.yview)
+        xscroll = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.text.xview)
+        self.text.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
 
+        # Pack widgets
+        self.line_numbers.pack(side=tk.LEFT, fill=tk.Y)
         self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         yscroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Horizontal scrollbar should span the full width of the application
+        xscroll.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # Store references for layout management
+        self.text_content_frame = text_content_frame
+        self.yscroll = yscroll
+        self.xscroll = xscroll
+        
+        # Bind events for line numbers
+        self.text.bind('<KeyRelease>', self._update_line_numbers)
+        self.text.bind('<ButtonRelease-1>', self._update_line_numbers)
+        self.show_line_numbers.trace_add('write', lambda *args: self._toggle_line_numbers())
+        
+        # Bind scrollbar to update line numbers
+        yscroll.config(command=lambda *args: self._on_yscroll(*args))
 
         # Status bar
         self.status = ttk.Label(self, relief=tk.SUNKEN, anchor=tk.W)
@@ -1154,6 +1193,7 @@ class LogViewerApp(tk.Tk):
             self.config_manager.set('display.max_lines', self.max_lines.get())
             self.config_manager.set('display.auto_scroll', self.autoscroll.get())
             self.config_manager.set('display.word_wrap', self.wrap.get())
+            self.config_manager.set('display.show_line_numbers', self.show_line_numbers.get())
             
             # Save current filter settings
             mode_index = self.filter_mode_combo.current()
@@ -1222,6 +1262,7 @@ class LogViewerApp(tk.Tk):
             self.config_manager.set('display.max_lines', self.max_lines.get())
             self.config_manager.set('display.auto_scroll', self.autoscroll.get())
             self.config_manager.set('display.word_wrap', self.wrap.get())
+            self.config_manager.set('display.show_line_numbers', self.show_line_numbers.get())
             
             # Save current filter settings
             mode_index = self.filter_mode_combo.current()
@@ -1306,6 +1347,9 @@ class LogViewerApp(tk.Tk):
                     self._set_status(f"Filtered: {matched_count}/{total_count} lines")
             else:
                 self._set_status(f"Showing all {total_count} lines")
+            
+            # Update line numbers after rebuilding view
+            self._update_line_numbers()
                 
         except Exception as e:
             self._set_status("Filter error: {}".format(e))
@@ -1361,6 +1405,7 @@ class LogViewerApp(tk.Tk):
 
     def _clear(self):
         self.text.delete('1.0', tk.END)
+        self._update_line_numbers()
 
     def _toggle_wrap(self):
         """Toggle word wrap and update menu checkmark."""
@@ -1659,6 +1704,9 @@ Tips:
         self._trim_if_needed()
         if self.autoscroll.get() and (at_end or self.paused.get() is False):
             self.text.see(tk.END)
+        
+        # Update line numbers after appending new text
+        self._update_line_numbers()
 
     def _poll(self):
         try:
@@ -1705,6 +1753,62 @@ Tips:
                     self.iconbitmap(fallback_path)
         except Exception:
             # Silently fail if icon setting fails
+            pass
+
+    def _on_scroll(self, *args):
+        """Handle scrollbar events for the text widget."""
+        # Only call yview if args are valid scrollbar commands
+        if args and args[0] in ['moveto', 'scroll']:
+            self.text.yview(*args)
+            self._sync_scroll()
+    
+    def _on_yscroll(self, *args):
+        """Handle vertical scrollbar events and update line numbers."""
+        self.text.yview(*args)
+        self._sync_scroll()
+
+    def _update_line_numbers(self, event=None):
+        """Update the line numbers display."""
+        if not self.show_line_numbers.get():
+            return
+            
+        try:
+            # Get the current number of lines
+            lines = self.text.get('1.0', tk.END).count('\n')
+            
+            # Update line numbers widget
+            self.line_numbers.config(state=tk.NORMAL)
+            self.line_numbers.delete('1.0', tk.END)
+            
+            for i in range(1, lines + 1):
+                self.line_numbers.insert(tk.END, f"{i}\n")
+            
+            self.line_numbers.config(state=tk.DISABLED)
+            
+            # Sync scroll position
+            self._sync_scroll()
+        except Exception:
+            pass
+    
+    def _toggle_line_numbers(self):
+        """Toggle line numbers display."""
+        if self.show_line_numbers.get():
+            # Make line numbers visible and update them
+            self.line_numbers.pack(side=tk.LEFT, fill=tk.Y, before=self.text)
+            self._update_line_numbers()
+        else:
+            # Hide line numbers
+            self.line_numbers.pack_forget()
+    
+    def _sync_scroll(self):
+        """Synchronize scroll position between text and line numbers."""
+        try:
+            # Get current scroll position
+            first, last = self.text.yview()
+            
+            # Apply same scroll position to line numbers
+            self.line_numbers.yview_moveto(first)
+        except Exception:
             pass
 
 
