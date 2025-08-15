@@ -673,6 +673,7 @@ class LogViewerApp(tk.Tk):
 
         # Store raw lines so we can rebuild view when filter changes
         self._line_buffer = collections.deque(maxlen=MAX_LINES_DEFAULT)
+        self._filtered_lines = []  # Store filtered lines with original line numbers
 
         self._build_ui()
         
@@ -961,6 +962,7 @@ class LogViewerApp(tk.Tk):
         """Clear the current filter."""
         self.filter_text.set("")
         self.filter_manager.clear_filter()
+        self._filtered_lines = []  # Clear filtered lines when filter is cleared
         self._rebuild_view()
         self._set_status("Filter cleared")
     
@@ -1334,9 +1336,13 @@ class LogViewerApp(tk.Tk):
             matched_count = 0
             total_count = len(self._line_buffer)
             
-            for line in self._line_buffer:
+            # Store filtered lines with their original line numbers
+            self._filtered_lines = []
+            
+            for i, line in enumerate(self._line_buffer, 1):
                 if self.filter_manager.matches(line):
                     self.text.insert(tk.END, line)
+                    self._filtered_lines.append((i, line))  # Store (original_line_number, line_content)
                     matched_count += 1
             
             if self.autoscroll.get() and at_end:
@@ -1776,17 +1782,27 @@ Tips:
             return
             
         try:
-            # Get the current number of lines
-            lines = self.text.get('1.0', tk.END).count('\n')
-            
-            # Update line numbers widget
-            self.line_numbers.config(state=tk.NORMAL)
-            self.line_numbers.delete('1.0', tk.END)
-            
-            for i in range(1, lines + 1):
-                self.line_numbers.insert(tk.END, f"{i}\n")
-            
-            self.line_numbers.config(state=tk.DISABLED)
+            # Check if we're showing filtered content
+            if hasattr(self, '_filtered_lines') and self._filtered_lines and self.filter_manager.current_filter:
+                # Show original line numbers for filtered content
+                self.line_numbers.config(state=tk.NORMAL)
+                self.line_numbers.delete('1.0', tk.END)
+                
+                for original_line_num, _ in self._filtered_lines:
+                    self.line_numbers.insert(tk.END, f"{original_line_num}\n")
+                
+                self.line_numbers.config(state=tk.DISABLED)
+            else:
+                # Show sequential line numbers for unfiltered content
+                lines = self.text.get('1.0', tk.END).count('\n')
+                
+                self.line_numbers.config(state=tk.NORMAL)
+                self.line_numbers.delete('1.0', tk.END)
+                
+                for i in range(1, lines + 1):
+                    self.line_numbers.insert(tk.END, f"{i}\n")
+                
+                self.line_numbers.config(state=tk.DISABLED)
             
             # Sync scroll position
             self._sync_scroll()
