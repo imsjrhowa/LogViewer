@@ -2,21 +2,24 @@
 """
 Log Viewer (auto-refresh) — Windows-friendly, 3.6+ compatible
 
-Features
-- Choose a log file via File → Open… or pass --file /path/to/file
-- Auto-refresh (500 ms by default), adjustable in the UI
-- Pause/Resume
-- Auto-scroll to bottom when new lines arrive
-- Word wrap toggle
-- Clear view
-- Handles file rotation/truncation
-- Auto-detects common encodings (UTF-16 LE/BE, UTF-8 BOM), with heuristic for NUL-byte "spaced" text
-- Multiple color themes (Dark, Light, Sunset)
-- Keeps memory in check by trimming to last N lines (default 10,000)
-- NEW: Live filter box (substring match) with case-sensitive toggle
+A comprehensive log file viewer with real-time monitoring, advanced filtering,
+multiple themes, and extensive customization options.
 
-Run
+Features:
+- Real-time log file monitoring with auto-refresh
+- Advanced filtering system with multiple modes (contains, regex, exact match, etc.)
+- Multiple color themes (Dark, Light, Sunset) with dynamic switching
+- Line numbers display with scroll synchronization
+- Word wrap and auto-scroll options
+- File encoding auto-detection (UTF-8, UTF-16, BOM detection)
+- Comprehensive settings management with import/export
+- Keyboard shortcuts for common operations
+- Filter history and preferences persistence
+- Professional UI with toolbar and status bar
+
+Usage:
     python log_viewer.py --file /path/to/your/log.txt
+    python log_viewer.py --theme light --refresh 1000
 
 Requires only the Python standard library.
 """
@@ -33,134 +36,196 @@ import json
 from tkinter import ttk, filedialog, messagebox
 from typing import Optional, Dict, Any, List, Tuple
 
-MAX_LINES_DEFAULT = 10_000
-DEFAULT_REFRESH_MS = 500
-DEFAULT_ENCODING = "auto"  # auto | utf-8 | utf-16 | utf-16-le | utf-16-be | etc.
-DEFAULT_THEME = "dark"     # dark | light | sunset
+# Global constants for application defaults
+MAX_LINES_DEFAULT = 10_000      # Maximum lines to keep in memory
+DEFAULT_REFRESH_MS = 500        # Default refresh interval in milliseconds
+DEFAULT_ENCODING = "auto"       # Default encoding (auto-detection enabled)
+DEFAULT_THEME = "dark"          # Default color theme
 
 
 class ThemeManager:
-    """Manages color themes for the Log Viewer application."""
+    """
+    Manages color themes for the Log Viewer application.
     
-    # Theme color definitions
+    Provides three built-in themes (Dark, Light, Sunset) with consistent
+    color schemes across all UI elements. Supports dynamic theme switching
+    and theme preference persistence.
+    """
+    
+    # Comprehensive theme color definitions for consistent UI appearance
     THEMES = {
         "dark": {
             "name": "Dark",
-            "bg": "#1e1e1e",           # Main background
-            "fg": "#d4d4d4",           # Main text
+            "bg": "#1e1e1e",           # Main application background
+            "fg": "#d4d4d4",           # Main text color
             "text_bg": "#1e1e1e",      # Text area background
-            "text_fg": "#d4d4d4",      # Text area text
-            "insert_bg": "#ffffff",    # Caret color
+            "text_fg": "#d4d4d4",      # Text area text color
+            "insert_bg": "#ffffff",    # Text cursor/caret color
             "toolbar_bg": "#2d2d2d",   # Toolbar background
-            "toolbar_fg": "#d4d4d4",   # Toolbar text
+            "toolbar_fg": "#d4d4d4",   # Toolbar text color
             "status_bg": "#2d2d2d",    # Status bar background
-            "status_fg": "#d4d4d4",    # Status bar text
+            "status_fg": "#d4d4d4",    # Status bar text color
             "menu_bg": "#2d2d2d",      # Menu background
-            "menu_fg": "#d4d4d4",      # Menu text
-            "menu_select_bg": "#404040", # Menu selection background
+            "menu_fg": "#d4d4d4",      # Menu text color
+            "menu_select_bg": "#404040", # Menu selection highlight
             "button_bg": "#404040",     # Button background
-            "button_fg": "#d4d4d4",    # Button text
+            "button_fg": "#d4d4d4",    # Button text color
             "entry_bg": "#3c3c3c",     # Entry field background
-            "entry_fg": "#d4d4d4",     # Entry field text
-            "entry_insert_bg": "#ffffff", # Entry caret color
+            "entry_fg": "#d4d4d4",     # Entry field text color
+            "entry_insert_bg": "#ffffff", # Entry field cursor color
         },
         "light": {
             "name": "Light",
-            "bg": "#ffffff",           # Main background
-            "fg": "#000000",           # Main text
+            "bg": "#ffffff",           # Main application background
+            "fg": "#000000",           # Main text color
             "text_bg": "#ffffff",      # Text area background
-            "text_fg": "#000000",      # Text area text
-            "insert_bg": "#000000",    # Caret color
+            "text_fg": "#000000",      # Text area text color
+            "insert_bg": "#000000",    # Text cursor/caret color
             "toolbar_bg": "#f0f0f0",   # Toolbar background
-            "toolbar_fg": "#000000",   # Toolbar text
+            "toolbar_fg": "#000000",   # Toolbar text color
             "status_bg": "#f0f0f0",    # Status bar background
-            "status_fg": "#000000",    # Status bar text
+            "status_fg": "#000000",    # Status bar text color
             "menu_bg": "#f0f0f0",      # Menu background
-            "menu_fg": "#000000",      # Menu text
-            "menu_select_bg": "#e0e0e0", # Menu selection background
+            "menu_fg": "#000000",      # Menu text color
+            "menu_select_bg": "#e0e0e0", # Menu selection highlight
             "button_bg": "#e0e0e0",     # Button background
-            "button_fg": "#000000",    # Button text
+            "button_fg": "#000000",    # Button text color
             "entry_bg": "#ffffff",     # Entry field background
-            "entry_fg": "#000000",     # Entry field text
-            "entry_insert_bg": "#000000", # Entry caret color
+            "entry_fg": "#000000",     # Entry field text color
+            "entry_insert_bg": "#000000", # Entry field cursor color
         },
         "sunset": {
             "name": "Sunset",
             "bg": "#2d1b3d",           # Main background (deep purple)
             "fg": "#f4e4bc",           # Main text (warm cream)
             "text_bg": "#2d1b3d",      # Text area background
-            "text_fg": "#f4e4bc",      # Text area text
-            "insert_bg": "#ff6b35",    # Caret color (orange)
+            "text_fg": "#f4e4bc",      # Text area text color
+            "insert_bg": "#ff6b35",    # Text cursor/caret color (orange)
             "toolbar_bg": "#3d2b4d",   # Toolbar background
-            "toolbar_fg": "#f4e4bc",   # Toolbar text
+            "toolbar_fg": "#f4e4bc",   # Toolbar text color
             "status_bg": "#3d2b4d",    # Status bar background
-            "status_fg": "#f4e4bc",    # Status bar text
+            "status_fg": "#f4e4bc",    # Status bar text color
             "menu_bg": "#3d2b4d",      # Menu background
-            "menu_fg": "#f4e4bc",      # Menu text
-            "menu_select_bg": "#4d3b5d", # Menu selection background
+            "menu_fg": "#f4e4bc",      # Menu text color
+            "menu_select_bg": "#4d3b5d", # Menu selection highlight
             "button_bg": "#4d3b5d",     # Button background
-            "button_fg": "#f4e4bc",    # Button text
+            "button_fg": "#f4e4bc",    # Button text color
             "entry_bg": "#3d2b4d",     # Entry field background
-            "entry_fg": "#f4e4bc",     # Entry field text
-            "entry_insert_bg": "#ff6b35", # Entry caret color
+            "entry_fg": "#f4e4bc",     # Entry field text color
+            "entry_insert_bg": "#ff6b35", # Entry field cursor color
         }
     }
     
     def __init__(self, theme_name: str = DEFAULT_THEME):
+        """
+        Initialize theme manager with specified theme.
+        
+        Args:
+            theme_name: Name of the initial theme to use
+        """
         self.current_theme = theme_name
+        # Fallback to default theme if specified theme doesn't exist
         if theme_name not in self.THEMES:
             self.current_theme = DEFAULT_THEME
     
     def get_theme(self, theme_name: str = None) -> Dict[str, Any]:
-        """Get theme colors by name."""
+        """
+        Get theme colors by name.
+        
+        Args:
+            theme_name: Name of theme to retrieve (None for current)
+            
+        Returns:
+            Dictionary containing theme color definitions
+        """
         if theme_name is None:
             theme_name = self.current_theme
         return self.THEMES.get(theme_name, self.THEMES[DEFAULT_THEME])
     
     def get_current_theme(self) -> Dict[str, Any]:
-        """Get current theme colors."""
+        """
+        Get current theme colors.
+        
+        Returns:
+            Dictionary containing current theme color definitions
+        """
         return self.get_theme(self.current_theme)
     
     def set_theme(self, theme_name: str) -> bool:
-        """Set current theme. Returns True if theme changed."""
+        """
+        Set current theme.
+        
+        Args:
+            theme_name: Name of theme to set
+            
+        Returns:
+            True if theme changed, False if theme doesn't exist
+        """
         if theme_name in self.THEMES:
             self.current_theme = theme_name
             return True
         return False
     
     def get_theme_names(self) -> list:
-        """Get list of available theme names."""
+        """
+        Get list of available theme names.
+        
+        Returns:
+            List of theme identifier strings
+        """
         return list(self.THEMES.keys())
     
     def get_theme_display_names(self) -> list:
-        """Get list of theme display names."""
+        """
+        Get list of theme display names for UI.
+        
+        Returns:
+            List of human-readable theme names
+        """
         return [self.THEMES[name]["name"] for name in self.THEMES]
 
 
 class FilterManager:
-    """Advanced filtering system for log entries with multiple modes and history."""
+    """
+    Advanced filtering system for log entries with multiple modes and history.
     
-    # Filter modes
+    Supports various filtering modes including substring matching, regex patterns,
+    exact matching, and negation. Maintains filter history and provides
+    comprehensive error handling for invalid patterns.
+    """
+    
+    # Available filter modes with human-readable descriptions
     MODES = {
-        "contains": "Contains",
-        "starts_with": "Starts With", 
-        "ends_with": "Ends With",
-        "regex": "Regular Expression",
-        "exact": "Exact Match",
-        "not_contains": "Not Contains"
+        "contains": "Contains",           # Text appears anywhere in line
+        "starts_with": "Starts With",     # Line begins with text
+        "ends_with": "Ends With",         # Line ends with text
+        "regex": "Regular Expression",    # Use regex patterns
+        "exact": "Exact Match",           # Line exactly matches text
+        "not_contains": "Not Contains"    # Line does NOT contain text
     }
     
     def __init__(self):
-        self.current_filter = ""
-        self.current_mode = "contains"
-        self.case_sensitive = False
-        self.filter_history = []
-        self.max_history = 20
-        self.compiled_regex = None
-        self.last_error = None
+        """Initialize filter manager with default settings."""
+        self.current_filter = ""          # Current filter text
+        self.current_mode = "contains"    # Current filter mode
+        self.case_sensitive = False       # Case sensitivity flag
+        self.filter_history = []          # List of previous filters
+        self.max_history = 20            # Maximum history items to keep
+        self.compiled_regex = None        # Compiled regex pattern (if applicable)
+        self.last_error = None            # Last regex compilation error
         
     def set_filter(self, text: str, mode: str = None, case_sensitive: bool = None) -> bool:
-        """Set the current filter. Returns True if filter changed."""
+        """
+        Set the current filter with optional mode and case sensitivity.
+        
+        Args:
+            text: Filter text to apply
+            mode: Filter mode (None to keep current)
+            case_sensitive: Case sensitivity flag (None to keep current)
+            
+        Returns:
+            True if filter changed, False if no change
+        """
         if mode is not None:
             self.current_mode = mode
         if case_sensitive is not None:
@@ -174,14 +239,25 @@ class FilterManager:
         return False
     
     def _add_to_history(self, text: str):
-        """Add filter text to history if it's not empty and not already there."""
+        """
+        Add filter text to history if it's not empty and not already there.
+        
+        Args:
+            text: Filter text to add to history
+        """
         if text and text not in self.filter_history:
             self.filter_history.insert(0, text)
+            # Maintain maximum history size
             if len(self.filter_history) > self.max_history:
                 self.filter_history.pop()
     
     def _compile_regex(self):
-        """Compile regex pattern if mode is regex."""
+        """
+        Compile regex pattern if mode is regex.
+        
+        Handles regex compilation errors gracefully and stores error messages
+        for user feedback.
+        """
         self.compiled_regex = None
         self.last_error = None
         
@@ -193,7 +269,15 @@ class FilterManager:
                 self.last_error = str(e)
     
     def matches(self, line: str) -> bool:
-        """Check if a line matches the current filter."""
+        """
+        Check if a line matches the current filter.
+        
+        Args:
+            line: Text line to check against filter
+            
+        Returns:
+            True if line matches filter, False otherwise
+        """
         if not self.current_filter:
             return True
             
@@ -201,6 +285,7 @@ class FilterManager:
             return False
             
         try:
+            # Route to appropriate matching method based on mode
             if self.current_mode == "contains":
                 return self._contains_match(line)
             elif self.current_mode == "starts_with":
@@ -219,41 +304,94 @@ class FilterManager:
             return False
     
     def _contains_match(self, line: str) -> bool:
-        """Check if line contains the filter text."""
+        """
+        Check if line contains the filter text.
+        
+        Args:
+            line: Text line to check
+            
+        Returns:
+            True if filter text is found in line
+        """
         if self.case_sensitive:
             return self.current_filter in line
         return self.current_filter.lower() in line.lower()
     
     def _starts_with_match(self, line: str) -> bool:
-        """Check if line starts with the filter text."""
+        """
+        Check if line starts with the filter text.
+        
+        Args:
+            line: Text line to check
+            
+        Returns:
+            True if line begins with filter text
+        """
         if self.case_sensitive:
             return line.startswith(self.current_filter)
         return line.lower().startswith(self.current_filter.lower())
     
     def _ends_with_match(self, line: str) -> bool:
-        """Check if line ends with the filter text."""
+        """
+        Check if line ends with the filter text.
+        
+        Args:
+            line: Text line to check
+            
+        Returns:
+            True if line ends with filter text
+        """
         if self.case_sensitive:
             return line.endswith(self.current_filter)
         return line.lower().endswith(self.current_filter.lower())
     
     def _regex_match(self, line: str) -> bool:
-        """Check if line matches the regex pattern."""
+        """
+        Check if line matches the regex pattern.
+        
+        Args:
+            line: Text line to check
+            
+        Returns:
+            True if line matches regex pattern
+        """
         if self.compiled_regex:
             return bool(self.compiled_regex.search(line))
         return False
     
     def _exact_match(self, line: str) -> bool:
-        """Check if line exactly matches the filter text."""
+        """
+        Check if line exactly matches the filter text.
+        
+        Args:
+            line: Text line to check
+            
+        Returns:
+            True if line exactly matches filter text
+        """
         if self.case_sensitive:
             return line == self.current_filter
         return line.lower() == self.current_filter.lower()
     
     def _not_contains_match(self, line: str) -> bool:
-        """Check if line does NOT contain the filter text."""
+        """
+        Check if line does NOT contain the filter text.
+        
+        Args:
+            line: Text line to check
+            
+        Returns:
+            True if line does NOT contain filter text
+        """
         return not self._contains_match(line)
     
     def get_filter_info(self) -> Dict[str, Any]:
-        """Get current filter information for display."""
+        """
+        Get current filter information for display and status updates.
+        
+        Returns:
+            Dictionary containing filter state information
+        """
         return {
             "text": self.current_filter,
             "mode": self.current_mode,
@@ -265,71 +403,96 @@ class FilterManager:
         }
     
     def get_mode_names(self) -> List[str]:
-        """Get list of available filter mode names."""
+        """
+        Get list of available filter mode names.
+        
+        Returns:
+            List of filter mode identifier strings
+        """
         return list(self.MODES.keys())
     
     def get_mode_display_names(self) -> List[str]:
-        """Get list of filter mode display names."""
+        """
+        Get list of filter mode display names for UI.
+        
+        Returns:
+            List of human-readable filter mode names
+        """
         return list(self.MODES.values())
     
     def clear_filter(self):
-        """Clear the current filter."""
+        """Clear the current filter and reset related state."""
         self.current_filter = ""
         self.compiled_regex = None
         self.last_error = None
 
 
 class ConfigManager:
-    """Manages application configuration and user preferences."""
+    """
+    Manages application configuration and user preferences.
     
+    Handles saving and loading of user settings including window geometry,
+    theme preferences, filter settings, and display options. Provides
+    import/export functionality and maintains backward compatibility.
+    """
+    
+    # Default configuration values for all application settings
     DEFAULT_CONFIG = {
         "window": {
-            "width": 1000,
-            "height": 1000,
-            "x": None,
-            "y": None,
-            "maximized": False
+            "width": 1000,        # Default window width
+            "height": 1000,       # Default window height
+            "x": None,            # Window X position (None = center)
+            "y": None,            # Window Y position (None = center)
+            "maximized": False    # Whether window starts maximized
         },
         "theme": {
-            "current": "dark",
-            "auto_switch": False,
-            "auto_switch_time": "18:00"
+            "current": "dark",           # Default theme
+            "auto_switch": False,        # Auto-switch themes based on time
+            "auto_switch_time": "18:00"  # Time to switch themes (HH:MM)
         },
         "filter": {
-            "default_mode": "contains",
-            "case_sensitive": False,
-            "remember_history": True,
-            "max_history": 20
+            "default_mode": "contains",  # Default filter mode
+            "case_sensitive": False,     # Default case sensitivity
+            "remember_history": True,    # Remember filter history
+            "max_history": 20           # Maximum history items
         },
         "display": {
-            "refresh_rate": 500,
-            "max_lines": 10000,
-            "auto_scroll": True,
-            "word_wrap": False,
-            "font_size": 11,
-            "font_family": None,
-            "show_line_numbers": True
+            "refresh_rate": 500,         # Default refresh rate (ms)
+            "max_lines": 10000,          # Maximum lines to display
+            "auto_scroll": True,         # Auto-scroll by default
+            "word_wrap": False,          # Word wrap by default
+            "font_size": 11,             # Default font size
+            "font_family": None,         # Default font family (None = system default)
+            "show_line_numbers": True    # Show line numbers by default
         },
         "file": {
-            "last_directory": "",
-            "last_file_path": "",
-            "remember_encoding": True,
-            "auto_detect_encoding": True
+            "last_directory": "",        # Last directory used in file dialog
+            "last_file_path": "",       # Last file opened
+            "remember_encoding": True,   # Remember file encoding
+            "auto_detect_encoding": True # Auto-detect file encoding
         },
         "ui": {
-            "show_toolbar": True,
-            "show_status_bar": True,
-            "toolbar_position": "top",
-            "status_bar_position": "bottom"
+            "show_toolbar": True,        # Show toolbar by default
+            "show_status_bar": True,     # Show status bar by default
+            "toolbar_position": "top",   # Toolbar position
+            "status_bar_position": "bottom" # Status bar position
         }
     }
     
     def __init__(self, config_dir: str = None):
+        """
+        Initialize configuration manager.
+        
+        Args:
+            config_dir: Directory to store configuration files (None = auto-detect)
+        """
         if config_dir is None:
-            # Use proper Windows path handling
+            # Use platform-appropriate configuration directory
             if sys.platform.startswith("win"):
+                # Windows: Use AppData\Local\LogViewer
                 config_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "LogViewer")
             else:
+                # Unix/Linux: Use ~/.logviewer
                 config_dir = os.path.expanduser("~/.logviewer")
         
         self.config_dir = config_dir
@@ -340,7 +503,12 @@ class ConfigManager:
         self.load_config()
     
     def load_config(self):
-        """Load configuration from file."""
+        """
+        Load configuration from file.
+        
+        Attempts to load user configuration, falling back to defaults
+        if the file doesn't exist or is corrupted.
+        """
         try:
             print(f"Debug: Checking if config file exists: {self.config_file}")
             if os.path.exists(self.config_file):
@@ -356,10 +524,15 @@ class ConfigManager:
         except Exception as e:
             print(f"Warning: Could not load config: {e}")
             print(f"Debug: Error details: {type(e).__name__}: {e}")
-            # Keep default config
+            # Keep default config on error
     
     def save_config(self):
-        """Save current configuration to file."""
+        """
+        Save current configuration to file.
+        
+        Creates configuration directory if it doesn't exist and writes
+        the current configuration in JSON format.
+        """
         try:
             print(f"Debug: Creating config directory: {self.config_dir}")
             os.makedirs(self.config_dir, exist_ok=True)
@@ -373,9 +546,23 @@ class ConfigManager:
             print(f"Debug: Error details: {type(e).__name__}: {e}")
     
     def _merge_config(self, loaded_config: Dict[str, Any]):
-        """Recursively merge loaded config with defaults."""
+        """
+        Recursively merge loaded config with defaults.
+        
+        This ensures that new configuration options are automatically
+        added to existing config files without losing user settings.
+        
+        Args:
+            loaded_config: Configuration loaded from file
+        """
         def _merge_dict(target: Dict[str, Any], source: Dict[str, Any]):
-            """Helper function to merge source into target recursively."""
+            """
+            Helper function to merge source into target recursively.
+            
+            Args:
+                target: Target dictionary to merge into
+                source: Source dictionary to merge from
+            """
             for key, value in source.items():
                 if key in target and isinstance(value, dict) and isinstance(target[key], dict):
                     # Recursively merge nested dictionaries
@@ -388,7 +575,19 @@ class ConfigManager:
         _merge_dict(self.config, loaded_config)
     
     def get(self, key_path: str, default=None):
-        """Get configuration value using dot notation (e.g., 'window.width')."""
+        """
+        Get configuration value using dot notation.
+        
+        Args:
+            key_path: Configuration key path (e.g., 'window.width')
+            default: Default value if key doesn't exist
+            
+        Returns:
+            Configuration value or default
+            
+        Example:
+            config.get('window.width', 800)  # Gets window.width or returns 800
+        """
         keys = key_path.split('.')
         value = self.config
         
@@ -400,7 +599,16 @@ class ConfigManager:
             return default
     
     def set(self, key_path: str, value):
-        """Set configuration value using dot notation."""
+        """
+        Set configuration value using dot notation.
+        
+        Args:
+            key_path: Configuration key path (e.g., 'window.width')
+            value: Value to set
+            
+        Example:
+            config.set('window.width', 1200)  # Sets window.width to 1200
+        """
         keys = key_path.split('.')
         config = self.config
         
@@ -414,17 +622,25 @@ class ConfigManager:
         config[keys[-1]] = value
     
     def get_window_geometry(self) -> str:
-        """Get window geometry string for Tkinter."""
+        """
+        Get window geometry string for Tkinter.
+        
+        Constructs a geometry string from saved window dimensions and position.
+        Validates dimensions and handles invalid positions gracefully.
+        
+        Returns:
+            Tkinter geometry string (e.g., "1000x800+100+100")
+        """
         width = self.get('window.width', 1000)
         height = self.get('window.height', 1000)
         x = self.get('window.x')
         y = self.get('window.y')
         
-        # Validate dimensions
-        width = max(800, min(width, 3000))  # Reasonable bounds
-        height = max(600, min(height, 2000))
+        # Validate dimensions within reasonable bounds
+        width = max(800, min(width, 3000))   # Min 800, Max 3000
+        height = max(600, min(height, 2000)) # Min 600, Max 2000
         
-        # On Windows, position might not work reliably, so we'll try both approaches
+        # On Windows, position might not work reliably, so validate coordinates
         if x is not None and y is not None and sys.platform.startswith("win"):
             # Try to center the window if position seems invalid
             if x < 0 or y < 0 or x > 3000 or y > 2000:
@@ -437,7 +653,15 @@ class ConfigManager:
             return f"{width}x{height}"
     
     def save_window_state(self, window: tk.Tk):
-        """Save current window state and position."""
+        """
+        Save current window state and position.
+        
+        Extracts window geometry and state information from the Tkinter window
+        and saves it to configuration for restoration on next launch.
+        
+        Args:
+            window: Tkinter window to save state from
+        """
         try:
             # Get window geometry
             geometry = window.geometry()
@@ -481,7 +705,7 @@ class ConfigManager:
             
         except Exception as e:
             print(f"Warning: Could not save window state: {e}")
-            # Set safe defaults
+            # Set safe defaults on error
             self.set('window.width', 1000)
             self.set('window.height', 1000)
             self.set('window.x', None)
@@ -489,12 +713,20 @@ class ConfigManager:
             self.set('window.maximized', False)
     
     def reset_to_defaults(self):
-        """Reset configuration to default values."""
+        """Reset configuration to default values and save to file."""
         self.config = self.DEFAULT_CONFIG.copy()
         self.save_config()
     
     def export_config(self, filepath: str):
-        """Export configuration to a file."""
+        """
+        Export configuration to a file.
+        
+        Args:
+            filepath: Path to export configuration to
+            
+        Raises:
+            Exception: If export fails
+        """
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
@@ -502,7 +734,15 @@ class ConfigManager:
             raise Exception(f"Could not export config: {e}")
     
     def import_config(self, filepath: str):
-        """Import configuration from a file."""
+        """
+        Import configuration from a file.
+        
+        Args:
+            filepath: Path to import configuration from
+            
+        Raises:
+            Exception: If import fails
+        """
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 loaded_config = json.load(f)
@@ -513,18 +753,41 @@ class ConfigManager:
 
 
 class TailReader:
-    """Efficiently read new bytes from a growing (append-only) text file.
-    Detects truncation and rotation and reopens as needed.
-    Includes BOM detection and heuristic for UTF-16 logs without BOM.
     """
+    Efficiently read new bytes from a growing (append-only) text file.
+    
+    Detects file truncation and rotation and reopens as needed. Includes
+    BOM detection and heuristic for UTF-16 logs without BOM. Optimized
+    for real-time log monitoring with minimal resource usage.
+    """
+    
     def __init__(self, path: str, encoding: str = DEFAULT_ENCODING):
+        """
+        Initialize tail reader.
+        
+        Args:
+            path: Path to the file to monitor
+            encoding: File encoding (use "auto" for auto-detection)
+        """
         self.path = path
         self.encoding = encoding
-        self._fh = None  # type: Optional[io.BufferedReader]
-        self._inode = None  # type: Optional[tuple]
-        self._pos = 0
+        self._fh = None  # File handle for reading
+        self._inode = None  # File inode for detecting rotation
+        self._pos = 0  # Current file position
 
     def _encoding_from_bom(self, fh) -> Optional[str]:
+        """
+        Detect encoding from Byte Order Mark (BOM).
+        
+        Examines the first few bytes of the file to detect common
+        encoding signatures like UTF-16 LE/BE and UTF-8 BOM.
+        
+        Args:
+            fh: File handle to examine
+            
+        Returns:
+            Detected encoding string or None if no BOM found
+        """
         pos = fh.tell()
         try:
             fh.seek(0)
@@ -542,9 +805,19 @@ class TailReader:
         return None
 
     def open(self, start_at_end=True):
+        """
+        Open the file for reading.
+        
+        Args:
+            start_at_end: If True, start reading from end of file
+            
+        Returns:
+            True if file opened successfully
+        """
         self.close()
         self._fh = open(self.path, "rb")
         try:
+            # Get file inode for rotation detection
             st = os.fstat(self._fh.fileno())
             self._inode = (st.st_dev, st.st_ino)
         except Exception:
@@ -556,14 +829,17 @@ class TailReader:
             self.encoding = enc or "utf-8"
 
         if start_at_end:
+            # Start reading from end of file (for tailing)
             self._fh.seek(0, io.SEEK_END)
             self._pos = self._fh.tell()
         else:
+            # Start reading from beginning of file
             self._fh.seek(0)
             self._pos = 0
         return True
 
     def close(self):
+        """Close the file handle and reset state."""
         try:
             if self._fh:
                 self._fh.close()
@@ -573,27 +849,43 @@ class TailReader:
             self._pos = 0
 
     def _check_rotation_or_truncate(self):
-        """Reopen file if inode changed (rotation) or size < pos (truncation)."""
+        """
+        Check for file rotation or truncation and reopen if needed.
+        
+        Detects when the file has been rotated (new inode) or truncated
+        (file size smaller than last position) and handles accordingly.
+        """
         try:
             st_path = os.stat(self.path)
             inode = (st_path.st_dev, st_path.st_ino)
         except OSError:
             return  # Possibly temporarily missing during rotation
+            
         if self._inode and inode != self._inode:
-            # rotated/recreated
+            # File rotated/recreated - reopen from beginning
             self.open(start_at_end=False)
             return
+            
         if self._fh:
             try:
                 size = os.fstat(self._fh.fileno()).st_size
                 if size < self._pos:
-                    # truncated
+                    # File truncated - reset to beginning
                     self._fh.seek(0)
                     self._pos = 0
             except OSError:
                 pass
 
     def read_new_text(self) -> str:
+        """
+        Read new text from the file since last read.
+        
+        Handles file rotation, truncation, and encoding issues gracefully.
+        Uses heuristics to detect UTF-16 files without BOM.
+        
+        Returns:
+            New text content as string
+        """
         if not self._fh:
             try:
                 self.open(start_at_end=False)
@@ -615,14 +907,33 @@ class TailReader:
         try:
             return data.decode(self.encoding, errors="replace")
         except LookupError:
+            # Fallback to UTF-8 if encoding not supported
             return data.decode("utf-8", errors="replace")
 
 
 class LogViewerApp(tk.Tk):
-    def __init__(self, path: Optional[str], refresh_ms: int = DEFAULT_REFRESH_MS, encoding: str = DEFAULT_ENCODING, theme: str = DEFAULT_THEME):
+    """
+    Main Log Viewer application class.
+    
+    Provides a comprehensive GUI for monitoring log files in real-time with
+    advanced filtering, multiple themes, and extensive customization options.
+    Built on Tkinter for cross-platform compatibility.
+    """
+    
+    def __init__(self, path: Optional[str], refresh_ms: int = DEFAULT_REFRESH_MS, 
+                 encoding: str = DEFAULT_ENCODING, theme: str = DEFAULT_THEME):
+        """
+        Initialize the Log Viewer application.
+        
+        Args:
+            path: Path to log file to open on startup (None = no file)
+            refresh_ms: Refresh interval in milliseconds
+            encoding: File encoding to use
+            theme: Initial color theme
+        """
         super().__init__()
         
-        # Initialize configuration manager first
+        # Initialize configuration manager first (needed for window setup)
         self.config_manager = ConfigManager()
         
         self.title("Log Viewer")
@@ -652,13 +963,14 @@ class LogViewerApp(tk.Tk):
         # Initialize theme manager with saved preference or command line argument
         self.theme_manager = ThemeManager(theme)  # Will be updated after UI is built
         
-        # Initialize filter manager
+        # Initialize filter manager for advanced filtering capabilities
         self.filter_manager = FilterManager()
         
+        # File handling
         self.path = path
         self.tail = TailReader(path, encoding=encoding) if path else None
         
-        # Load settings from config
+        # Load settings from configuration with fallbacks to defaults
         self.refresh_ms = tk.IntVar(value=self.config_manager.get('display.refresh_rate', refresh_ms))
         self.autoscroll = tk.BooleanVar(value=self.config_manager.get('display.auto_scroll', True))
         self.wrap = tk.BooleanVar(value=self.config_manager.get('display.word_wrap', False))
@@ -666,16 +978,17 @@ class LogViewerApp(tk.Tk):
         self.paused = tk.BooleanVar(value=False)
         self.max_lines = tk.IntVar(value=self.config_manager.get('display.max_lines', MAX_LINES_DEFAULT))
 
-        # Filtering
+        # Filtering variables
         self.filter_text = tk.StringVar(value="")
         self.case_sensitive = tk.BooleanVar(value=False)
         self.filter_mode = tk.StringVar(value="contains")
-        self._filter_job = None  # debounce handle
+        self._filter_job = None  # Debounce handle for filter updates
 
-        # Store raw lines so we can rebuild view when filter changes
-        self._line_buffer = collections.deque(maxlen=MAX_LINES_DEFAULT)
+        # Data storage for efficient filtering and display
+        self._line_buffer = collections.deque(maxlen=MAX_LINES_DEFAULT)  # Raw lines storage
         self._filtered_lines = []  # Store filtered lines with original line numbers
 
+        # Build the user interface
         self._build_ui()
         
         # Load saved theme preference if using default theme
@@ -683,27 +996,31 @@ class LogViewerApp(tk.Tk):
             saved_theme = self._load_theme_preference()
             if saved_theme != DEFAULT_THEME:
                 self.theme_manager.set_theme(saved_theme)
-                # Update menu checkmarks
+                # Update menu checkmarks to reflect saved theme
                 for name, var in self.theme_vars.items():
                     var.set(name == saved_theme)
         
-        # Ensure the icon is set for the current theme (command line or saved)
+        # Set application icon based on current theme
         self._set_app_icon()
         
         # Load saved filter preferences
         self._load_filter_preferences()
         
-        self._apply_theme()  # Apply initial theme
+        # Apply initial theme to all UI elements
+        self._apply_theme()
         
-        # Check if we should open the last file from config
+        # Check if we should open the last file from configuration
         if not self.path:  # Only if no file was passed via command line
             last_file_path = self.config_manager.get('file.last_file_path', '')
             if last_file_path and os.path.exists(last_file_path):
                 self.path = last_file_path
                 self._set_status(f"Opening last file: {os.path.basename(last_file_path)}")
         
+        # Open file if specified and start monitoring
         if self.path:
             self._open_path(self.path, first_open=True)
+            
+        # Start the polling loop for file updates
         self.after(self.refresh_ms.get(), self._poll)
         
         # Bind window close event to save configuration
@@ -711,22 +1028,28 @@ class LogViewerApp(tk.Tk):
 
     # UI
     def _build_ui(self):
-        # Menu
+        """
+        Build the complete user interface.
+        
+        Creates menus, toolbar, text area with line numbers, scrollbars,
+        and status bar. Sets up keyboard shortcuts and event bindings.
+        """
+        # Create main menu bar
         menubar = tk.Menu(self)
         
-        # File menu
+        # File menu for file operations
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="Open…", command=self._choose_file)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.destroy)
         menubar.add_cascade(label="File", menu=file_menu)
         
-        # View menu with theme selection
+        # View menu for display options and theme selection
         view_menu = tk.Menu(menubar, tearoff=0)
         view_menu.add_command(label="Word Wrap", command=self._toggle_wrap)
         view_menu.add_separator()
         
-        # Theme submenu
+        # Theme submenu with checkmarks for current selection
         theme_menu = tk.Menu(view_menu, tearoff=0)
         self.theme_vars = {}
         for theme_name in self.theme_manager.get_theme_names():
@@ -741,7 +1064,7 @@ class LogViewerApp(tk.Tk):
         
         menubar.add_cascade(label="View", menu=view_menu)
         
-        # Settings menu
+        # Settings menu for application preferences
         settings_menu = tk.Menu(menubar, tearoff=0)
         settings_menu.add_command(label="Preferences...", command=self._show_settings)
         settings_menu.add_separator()
@@ -752,7 +1075,7 @@ class LogViewerApp(tk.Tk):
         settings_menu.add_command(label="Import Settings...", command=self._import_settings)
         menubar.add_cascade(label="Settings", menu=settings_menu)
         
-        # Help menu
+        # Help menu for user assistance
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="Filter Help", command=self._show_filter_help)
         help_menu.add_command(label="Theme Info", command=self._show_theme_info)
@@ -760,43 +1083,49 @@ class LogViewerApp(tk.Tk):
         menubar.add_cascade(label="Help", menu=help_menu)
         self.config(menu=menubar)
         
-        # Bind keyboard shortcuts
-        self.bind('<Control-t>', lambda e: self._cycle_theme())
-        self.bind('<Control-T>', lambda e: self._cycle_theme())
-        self.bind('<Control-f>', lambda e: self._focus_filter())
-        self.bind('<Control-F>', lambda e: self._focus_filter())
-        self.bind('<Control-w>', lambda e: self._toggle_wrap())
-        self.bind('<Control-W>', lambda e: self._toggle_wrap())
-        self.bind('<Control-p>', lambda e: self._toggle_pause())
-        self.bind('<Control-P>', lambda e: self._toggle_pause())
+        # Bind keyboard shortcuts for common operations
+        self.bind('<Control-t>', lambda e: self._cycle_theme())      # Cycle themes
+        self.bind('<Control-T>', lambda e: self._cycle_theme())      # Cycle themes (Shift)
+        self.bind('<Control-f>', lambda e: self._focus_filter())     # Focus filter
+        self.bind('<Control-F>', lambda e: self._focus_filter())     # Focus filter (Shift)
+        self.bind('<Control-w>', lambda e: self._toggle_wrap())      # Toggle word wrap
+        self.bind('<Control-W>', lambda e: self._toggle_wrap())      # Toggle word wrap (Shift)
+        self.bind('<Control-p>', lambda e: self._toggle_pause())     # Toggle pause
+        self.bind('<Control-P>', lambda e: self._toggle_pause())     # Toggle pause (Shift)
         
         # Filter-specific shortcuts
-        self.bind('<Escape>', lambda e: self._clear_filter())
-        self.bind('<Control-r>', lambda e: self._focus_filter())
-        self.bind('<Control-R>', lambda e: self._focus_filter())
+        self.bind('<Escape>', lambda e: self._clear_filter())        # Clear filter
+        self.bind('<Control-r>', lambda e: self._focus_filter())     # Focus filter (alternative)
+        self.bind('<Control-R>', lambda e: self._focus_filter())     # Focus filter (alternative, Shift)
 
-        # Controls / toolbar
+        # Create main toolbar with controls
         toolbar = ttk.Frame(self, padding=(8, 4))
         toolbar.pack(fill=tk.X)
 
+        # File path display
         self.path_label = ttk.Label(toolbar, text="No file selected", width=80)
         self.path_label.pack(side=tk.LEFT, padx=(0, 8))
 
+        # Refresh rate control
         ttk.Label(toolbar, text="Refresh (ms)").pack(side=tk.LEFT)
         refresh_entry = ttk.Spinbox(toolbar, from_=100, to=5000, textvariable=self.refresh_ms, width=6)
         refresh_entry.pack(side=tk.LEFT, padx=(4, 10))
 
+        # Display options
         ttk.Checkbutton(toolbar, text="Auto-scroll", variable=self.autoscroll).pack(side=tk.LEFT)
         ttk.Checkbutton(toolbar, text="Wrap", variable=self.wrap, command=self._apply_wrap).pack(side=tk.LEFT, padx=(8, 8))
         ttk.Checkbutton(toolbar, text="Line Numbers", variable=self.show_line_numbers, command=self._toggle_line_numbers).pack(side=tk.LEFT, padx=(8, 8))
+        
+        # Performance settings
         ttk.Label(toolbar, text="Max lines").pack(side=tk.LEFT)
         ttk.Spinbox(toolbar, from_=1000, to=200000, increment=1000, textvariable=self.max_lines, width=7).pack(side=tk.LEFT, padx=(4, 8))
 
+        # Control buttons
         self.pause_btn = ttk.Button(toolbar, text="Pause", command=self._toggle_pause)
         self.pause_btn.pack(side=tk.LEFT, padx=(8, 4))
         ttk.Button(toolbar, text="Clear", command=self._clear).pack(side=tk.LEFT)
 
-        # Enhanced Filter controls
+        # Enhanced Filter controls section
         filter_frame = ttk.Frame(toolbar)
         filter_frame.pack(side=tk.LEFT, padx=(12, 4))
         
@@ -807,26 +1136,26 @@ class LogViewerApp(tk.Tk):
                                              width=12, state="readonly")
         self.filter_mode_combo.pack(side=tk.LEFT, padx=(4, 0))
         
-        # Filter entry with history
+        # Filter entry with history dropdown
         ttk.Label(filter_frame, text="Filter:").pack(side=tk.LEFT, padx=(8, 4))
         
-        # Filter entry frame for dropdown
+        # Filter entry frame for dropdown integration
         filter_entry_frame = ttk.Frame(filter_frame)
         filter_entry_frame.pack(side=tk.LEFT)
         
         self.filter_entry = ttk.Entry(filter_entry_frame, textvariable=self.filter_text, width=30)
         self.filter_entry.pack(side=tk.LEFT)
         
-        # Filter history dropdown
+        # Filter history dropdown button
         self.filter_history_btn = ttk.Button(filter_entry_frame, text="▼", width=2,
                                            command=self._show_filter_history)
         self.filter_history_btn.pack(side=tk.LEFT)
         
-        # Filter controls
+        # Filter control buttons
         filter_controls_frame = ttk.Frame(filter_frame)
         filter_controls_frame.pack(side=tk.LEFT, padx=(4, 0))
         
-        # Case sensitive checkbox
+        # Case sensitivity checkbox
         self.case_sensitive_cb = ttk.Checkbutton(filter_controls_frame, text="Case", 
                                                 variable=self.case_sensitive, 
                                                 command=self._on_filter_change)
@@ -846,7 +1175,7 @@ class LogViewerApp(tk.Tk):
         self.filter_status_label = ttk.Label(filter_controls_frame, text="", width=8)
         self.filter_status_label.pack(side=tk.LEFT, padx=(4, 0))
         
-        # Theme indicator (right side)
+        # Theme indicator and controls (right side of toolbar)
         theme_frame = ttk.Frame(toolbar)
         theme_frame.pack(side=tk.RIGHT, padx=(8, 0))
         
@@ -857,7 +1186,7 @@ class LogViewerApp(tk.Tk):
         self.theme_preview_btn = ttk.Button(theme_frame, text="🎨", width=3, command=self._show_theme_preview)
         self.theme_preview_btn.pack(side=tk.LEFT, padx=(4, 0))
         
-        # Bind filter events
+        # Bind filter events for real-time updates
         self.filter_text.trace_add('write', lambda *args: self._on_filter_change())
         self.filter_mode_combo.bind('<<ComboboxSelected>>', self._on_filter_mode_change)
         self.case_sensitive.trace_add('write', lambda *args: self._on_filter_change())
@@ -865,7 +1194,7 @@ class LogViewerApp(tk.Tk):
         # Set initial filter mode
         self.filter_mode_combo.set(self.filter_manager.get_mode_display_names()[0])
 
-        # Text area with line numbers support
+        # Create main text area with line numbers support
         text_frame = ttk.Frame(self)
         text_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -873,27 +1202,27 @@ class LogViewerApp(tk.Tk):
         text_content_frame = ttk.Frame(text_frame)
         text_content_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Line numbers widget
+        # Line numbers widget (left side)
         self.line_numbers = tk.Text(
             text_content_frame,
-            width=8,
-            padx=3,
-            pady=2,
-            relief=tk.FLAT,
-            borderwidth=0,
-            state=tk.DISABLED,
-            font=("Consolas", 11)
+            width=8,                    # Fixed width for line numbers
+            padx=3,                     # Horizontal padding
+            pady=2,                     # Vertical padding
+            relief=tk.FLAT,             # No border
+            borderwidth=0,              # No border width
+            state=tk.DISABLED,          # Read-only
+            font=("Consolas", 11)       # Monospace font for alignment
         )
         
-        # Main text widget
+        # Main text widget for log content
         self.text = tk.Text(
             text_content_frame,
-            wrap=tk.WORD if self.wrap.get() else tk.NONE,
-            undo=False,
-            font=("Consolas", 11)
+            wrap=tk.WORD if self.wrap.get() else tk.NONE,  # Word wrap based on setting
+            undo=False,                  # Disable undo for performance
+            font=("Consolas", 11)       # Monospace font for log readability
         )
 
-        # Scrollbars
+        # Scrollbars for navigation
         yscroll = ttk.Scrollbar(text_content_frame, orient=tk.VERTICAL, command=self.text.yview)
         xscroll = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.text.xview)
         self.text.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
@@ -904,7 +1233,7 @@ class LogViewerApp(tk.Tk):
         self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         yscroll.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Horizontal scrollbar should span the full width of the application
+        # Horizontal scrollbar spans the full width of the application
         xscroll.pack(side=tk.BOTTOM, fill=tk.X)
         
         # Store references for layout management
@@ -912,7 +1241,7 @@ class LogViewerApp(tk.Tk):
         self.yscroll = yscroll
         self.xscroll = xscroll
         
-        # Bind events for line numbers
+        # Bind events for line numbers synchronization
         self.text.bind('<KeyRelease>', self._update_line_numbers)
         self.text.bind('<ButtonRelease-1>', self._update_line_numbers)
         self.text.bind('<MouseWheel>', self._on_mouse_wheel)  # Windows mouse wheel
@@ -923,14 +1252,19 @@ class LogViewerApp(tk.Tk):
         # Bind scrollbar to update line numbers
         yscroll.config(command=lambda *args: self._on_yscroll(*args))
 
-        # Status bar
+        # Status bar for information display
         self.status = ttk.Label(self, relief=tk.SUNKEN, anchor=tk.W)
         self.status.pack(fill=tk.X)
 
     # Enhanced Filtering
     def _on_filter_change(self):
-        """Handle filter text or case sensitivity changes."""
-        # Update filter manager
+        """
+        Handle filter text or case sensitivity changes.
+        
+        Updates the filter manager with new settings and triggers a
+        debounced view rebuild to avoid excessive updates during typing.
+        """
+        # Update filter manager with current UI state
         mode_index = self.filter_mode_combo.current()
         mode_name = self.filter_manager.get_mode_names()[mode_index]
         
@@ -951,7 +1285,12 @@ class LogViewerApp(tk.Tk):
             self._filter_job = self.after(150, self._rebuild_view)
     
     def _update_filter_status(self):
-        """Update the filter status indicator."""
+        """
+        Update the filter status indicator.
+        
+        Shows visual feedback about filter state including errors
+        and active status.
+        """
         info = self.filter_manager.get_filter_info()
         
         if info["is_active"]:
@@ -963,11 +1302,24 @@ class LogViewerApp(tk.Tk):
             self.filter_status_label.config(text="", foreground="black")
     
     def _on_filter_mode_change(self, event=None):
-        """Handle filter mode changes."""
+        """
+        Handle filter mode changes.
+        
+        Triggered when user selects a different filter mode from
+        the dropdown menu.
+        
+        Args:
+            event: Tkinter event (unused)
+        """
         self._on_filter_change()
     
     def _clear_filter(self):
-        """Clear the current filter."""
+        """
+        Clear the current filter.
+        
+        Resets filter text, clears filtered lines cache, and
+        rebuilds the view to show all content.
+        """
         self.filter_text.set("")
         self.filter_manager.clear_filter()
         self._filtered_lines = []  # Clear filtered lines when filter is cleared
@@ -975,7 +1327,12 @@ class LogViewerApp(tk.Tk):
         self._set_status("Filter cleared")
     
     def _show_settings(self):
-        """Show the settings/preferences dialog."""
+        """
+        Show the settings/preferences dialog.
+        
+        Creates a comprehensive settings dialog with multiple tabs for
+        organizing different categories of preferences.
+        """
         settings_window = tk.Toplevel(self)
         settings_window.title("Log Viewer Settings")
         settings_window.geometry("600x700")
@@ -983,34 +1340,34 @@ class LogViewerApp(tk.Tk):
         settings_window.transient(self)
         settings_window.grab_set()
         
-        # Center the window
+        # Center the window relative to main application
         settings_window.geometry("+%d+%d" % (self.winfo_rootx() + 100, self.winfo_rooty() + 100))
         
-        # Create notebook for tabs
+        # Create notebook for tabbed interface
         notebook = ttk.Notebook(settings_window)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # General tab
+        # General settings tab
         general_frame = ttk.Frame(notebook)
         notebook.add(general_frame, text="General")
         self._create_general_settings_tab(general_frame)
         
-        # Display tab
+        # Display settings tab
         display_frame = ttk.Frame(notebook)
         notebook.add(display_frame, text="Display")
         self._create_display_settings_tab(display_frame)
         
-        # Filter tab
+        # Filter settings tab
         filter_frame = ttk.Frame(notebook)
         notebook.add(filter_frame, text="Filtering")
         self._create_filter_settings_tab(filter_frame)
         
-        # Theme tab
+        # Theme settings tab
         theme_frame = ttk.Frame(notebook)
         notebook.add(theme_frame, text="Theme")
         self._create_theme_settings_tab(theme_frame)
         
-        # Buttons
+        # Action buttons
         button_frame = ttk.Frame(settings_window)
         button_frame.pack(fill=tk.X, padx=10, pady=10)
         
@@ -1019,12 +1376,19 @@ class LogViewerApp(tk.Tk):
         ttk.Button(button_frame, text="Apply", command=self._apply_settings).pack(side=tk.RIGHT, padx=5)
     
     def _create_general_settings_tab(self, parent):
-        """Create the general settings tab."""
-        # Window settings
+        """
+        Create the general settings tab.
+        
+        Contains window settings and file handling preferences.
+        
+        Args:
+            parent: Parent frame for the tab
+        """
+        # Window settings section
         window_frame = ttk.LabelFrame(parent, text="Window", padding=10)
         window_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        # Window size
+        # Window size controls
         ttk.Label(window_frame, text="Default Window Size:").grid(row=0, column=0, sticky=tk.W, pady=2)
         
         size_frame = ttk.Frame(window_frame)
@@ -1038,11 +1402,11 @@ class LogViewerApp(tk.Tk):
         ttk.Label(size_frame, text="Height:").pack(side=tk.LEFT, padx=5)
         ttk.Entry(size_frame, textvariable=self.settings_height, width=8).pack(side=tk.LEFT, padx=5)
         
-        # Remember window position
+        # Remember window position option
         self.settings_remember_pos = tk.BooleanVar(value=self.config_manager.get('window.x') is not None)
         ttk.Checkbutton(window_frame, text="Remember window position", variable=self.settings_remember_pos).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
         
-        # File settings
+        # File handling settings section
         file_frame = ttk.LabelFrame(parent, text="File Handling", padding=10)
         file_frame.pack(fill=tk.X, padx=10, pady=5)
         
@@ -1053,8 +1417,15 @@ class LogViewerApp(tk.Tk):
         ttk.Checkbutton(file_frame, text="Auto-detect file encoding", variable=self.settings_auto_encoding).grid(row=1, column=0, sticky=tk.W, pady=2)
     
     def _create_display_settings_tab(self, parent):
-        """Create the display settings tab."""
-        # Refresh settings
+        """
+        Create the display settings tab.
+        
+        Contains refresh settings, display options, and font preferences.
+        
+        Args:
+            parent: Parent frame for the tab
+        """
+        # Refresh and performance settings section
         refresh_frame = ttk.LabelFrame(parent, text="Refresh & Performance", padding=10)
         refresh_frame.pack(fill=tk.X, padx=10, pady=5)
         
@@ -1066,7 +1437,7 @@ class LogViewerApp(tk.Tk):
         self.settings_max_lines = tk.StringVar(value=str(self.config_manager.get('display.max_lines', 10000)))
         ttk.Entry(refresh_frame, textvariable=self.settings_max_lines, width=10).grid(row=1, column=1, sticky=tk.W, pady=2)
         
-        # Display options
+        # Display options section
         display_frame = ttk.LabelFrame(parent, text="Display Options", padding=10)
         display_frame.pack(fill=tk.X, padx=10, pady=5)
         
@@ -1076,7 +1447,7 @@ class LogViewerApp(tk.Tk):
         self.settings_word_wrap = tk.BooleanVar(value=self.config_manager.get('display.word_wrap', False))
         ttk.Checkbutton(display_frame, text="Word wrap by default", variable=self.settings_word_wrap).grid(row=1, column=0, sticky=tk.W, pady=2)
         
-        # Font settings
+        # Font settings section
         font_frame = ttk.LabelFrame(parent, text="Font", padding=10)
         font_frame.pack(fill=tk.X, padx=10, pady=5)
         
@@ -1085,18 +1456,25 @@ class LogViewerApp(tk.Tk):
         ttk.Entry(font_frame, textvariable=self.settings_font_size, width=8).grid(row=0, column=1, sticky=tk.W, pady=2)
     
     def _create_filter_settings_tab(self, parent):
-        """Create the filter settings tab."""
+        """
+        Create the filter settings tab.
+        
+        Contains filter preferences and history settings.
+        
+        Args:
+            parent: Parent frame for the tab
+        """
         filter_frame = ttk.LabelFrame(parent, text="Filter Preferences", padding=10)
         filter_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        # Default filter mode
+        # Default filter mode selection
         ttk.Label(filter_frame, text="Default Filter Mode:").grid(row=0, column=0, sticky=tk.W, pady=2)
         self.settings_filter_mode = tk.StringVar(value=self.config_manager.get('filter.default_mode', 'contains'))
         filter_mode_combo = ttk.Combobox(filter_frame, textvariable=self.settings_filter_mode, 
                                         values=self.filter_manager.get_mode_display_names(), state="readonly")
         filter_mode_combo.grid(row=0, column=1, sticky=tk.W, pady=2)
         
-        # Filter options
+        # Filter behavior options
         self.settings_case_sensitive = tk.BooleanVar(value=self.config_manager.get('filter.case_sensitive', False))
         ttk.Checkbutton(filter_frame, text="Case sensitive by default", variable=self.settings_case_sensitive).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
         
@@ -1108,18 +1486,25 @@ class LogViewerApp(tk.Tk):
         ttk.Entry(filter_frame, textvariable=self.settings_max_history, width=8).grid(row=3, column=1, sticky=tk.W, pady=2)
     
     def _create_theme_settings_tab(self, parent):
-        """Create the theme settings tab."""
+        """
+        Create the theme settings tab.
+        
+        Contains theme preferences and auto-switching options.
+        
+        Args:
+            parent: Parent frame for the tab
+        """
         theme_frame = ttk.LabelFrame(parent, text="Theme Preferences", padding=10)
         theme_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        # Default theme
+        # Default theme selection
         ttk.Label(theme_frame, text="Default Theme:").grid(row=0, column=0, sticky=tk.W, pady=2)
         self.settings_default_theme = tk.StringVar(value=self.config_manager.get('theme.current', 'dark'))
         theme_combo = ttk.Combobox(theme_frame, textvariable=self.settings_default_theme, 
                                   values=self.theme_manager.get_theme_names(), state="readonly")
         theme_combo.grid(row=0, column=1, sticky=tk.W, pady=2)
         
-        # Auto-switch theme
+        # Auto-switch theme options
         self.settings_auto_switch_theme = tk.BooleanVar(value=self.config_manager.get('theme.auto_switch', False))
         ttk.Checkbutton(theme_frame, text="Auto-switch theme based on time", variable=self.settings_auto_switch_theme).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
         
@@ -1128,7 +1513,12 @@ class LogViewerApp(tk.Tk):
         ttk.Entry(theme_frame, textvariable=self.settings_switch_time, width=10).grid(row=2, column=1, sticky=tk.W, pady=2)
     
     def _apply_settings(self):
-        """Apply current settings without closing the dialog."""
+        """
+        Apply current settings without closing the dialog.
+        
+        Saves all current settings values to the configuration system
+        and applies some settings immediately to the running application.
+        """
         try:
             # Save window settings
             self.config_manager.set('window.width', int(self.settings_width.get()))
@@ -1179,12 +1569,22 @@ class LogViewerApp(tk.Tk):
             messagebox.showerror("Error", f"Failed to apply settings: {e}")
     
     def _save_settings_and_close(self, window):
-        """Save settings and close the dialog."""
+        """
+        Save settings and close the dialog.
+        
+        Args:
+            window: Settings window to close
+        """
         self._apply_settings()
         window.destroy()
     
     def _apply_current_settings(self):
-        """Apply current configuration to the running application."""
+        """
+        Apply current configuration to the running application.
+        
+        Updates font settings and other runtime-configurable options
+        without requiring a restart.
+        """
         # Update font size if changed
         font_size = self.config_manager.get('display.font_size', 11)
         font_family = self.config_manager.get('display.font_family')
@@ -1196,7 +1596,12 @@ class LogViewerApp(tk.Tk):
             self.text.configure(font=(font_family, font_size))
     
     def _save_as_default(self):
-        """Save current application state as default settings."""
+        """
+        Save current application state as default settings.
+        
+        Captures the current state of all configurable options and
+        saves them as the new default values for future sessions.
+        """
         try:
             # Save current window state
             self.config_manager.save_window_state(self)
@@ -1236,7 +1641,12 @@ class LogViewerApp(tk.Tk):
             messagebox.showerror("Error", f"Failed to save settings: {e}")
     
     def _reset_settings(self):
-        """Reset all settings to default values."""
+        """
+        Reset all settings to default values.
+        
+        Prompts user for confirmation before resetting all configuration
+        to factory defaults. Cannot be undone.
+        """
         if messagebox.askyesno("Reset Settings", 
                               "Are you sure you want to reset all settings to default values?\n\nThis cannot be undone."):
             self.config_manager.reset_to_defaults()
@@ -1244,7 +1654,12 @@ class LogViewerApp(tk.Tk):
             messagebox.showinfo("Reset Complete", "All settings have been reset to default values.\n\nRestart the application to apply the changes.")
     
     def _export_settings(self):
-        """Export current settings to a file."""
+        """
+        Export current settings to a file.
+        
+        Allows users to backup their configuration or share it
+        with other installations.
+        """
         filepath = filedialog.asksaveasfilename(
             title="Export Settings",
             defaultextension=".json",
@@ -1259,7 +1674,12 @@ class LogViewerApp(tk.Tk):
                 messagebox.showerror("Export Error", f"Failed to export settings: {e}")
     
     def _import_settings(self):
-        """Import settings from a file."""
+        """
+        Import settings from a file.
+        
+        Allows users to restore settings from a backup or
+        import settings from another installation.
+        """
         filepath = filedialog.askopenfilename(
             title="Import Settings",
             filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
@@ -1273,7 +1693,12 @@ class LogViewerApp(tk.Tk):
                 messagebox.showerror("Import Error", f"Failed to import settings: {e}")
     
     def _on_closing(self):
-        """Handle application closing - save configuration."""
+        """
+        Handle application closing - save configuration.
+        
+        Called when the user closes the application window.
+        Saves all current settings and window state before exit.
+        """
         try:
             # Save current window state
             self.config_manager.save_window_state(self)
@@ -1353,8 +1778,15 @@ class LogViewerApp(tk.Tk):
         self._set_status(f"Using filter from history: {filter_text[:30]}...")
     
     def _rebuild_view(self):
-        """Re-render the text widget from the buffered lines using the current filter."""
+        """
+        Re-render the text widget from the buffered lines using the current filter.
+        
+        This method efficiently rebuilds the display by applying the current
+        filter to all stored lines, maintaining original line numbers for
+        accurate reference.
+        """
         try:
+            # Clear current display
             self.text.delete('1.0', tk.END)
             at_end = True
             matched_count = 0
@@ -1363,12 +1795,14 @@ class LogViewerApp(tk.Tk):
             # Store filtered lines with their original line numbers
             self._filtered_lines = []
             
+            # Apply filter to all stored lines
             for i, line in enumerate(self._line_buffer, 1):
                 if self.filter_manager.matches(line):
                     self.text.insert(tk.END, line)
                     self._filtered_lines.append((i, line))  # Store (original_line_number, line_content)
                     matched_count += 1
             
+            # Auto-scroll if configured and we were at the end
             if self.autoscroll.get() and at_end:
                 self.text.see(tk.END)
             
@@ -1401,11 +1835,27 @@ class LogViewerApp(tk.Tk):
 
     # Actions
     def _choose_file(self):
+        """
+        Open file dialog to choose a log file.
+        
+        Shows a file selection dialog and opens the selected file
+        if the user makes a selection.
+        """
         path = filedialog.askopenfilename(title="Choose log file")
         if path:
             self._open_path(path, first_open=True)
 
     def _open_path(self, path: str, first_open=False):
+        """
+        Open a log file for monitoring.
+        
+        Initializes the tail reader and loads initial content if the file
+        is small enough. Handles file opening errors gracefully.
+        
+        Args:
+            path: Path to the log file to open
+            first_open: Whether this is the first file opened in this session
+        """
         self.path = path
         self.path_label.config(text=path)
         try:
@@ -1422,7 +1872,7 @@ class LogViewerApp(tk.Tk):
                 pass
             self.tail.open(start_at_end=start_at_end)
             if not start_at_end:
-                # Load initial chunk
+                # Load initial chunk for small files
                 text = self.tail.read_new_text()
                 if text:
                     self._append(text)
@@ -1432,28 +1882,53 @@ class LogViewerApp(tk.Tk):
             self._set_status("Open failed")
 
     def _toggle_pause(self):
+        """
+        Toggle pause/resume state of log monitoring.
+        
+        Updates button text and status to reflect current state.
+        """
         self.paused.set(not self.paused.get())
         self.pause_btn.config(text="Resume" if self.paused.get() else "Pause")
         self._set_status("Paused" if self.paused.get() else "Running")
 
     def _clear(self):
+        """
+        Clear the text display.
+        
+        Removes all content from the text widget and updates line numbers.
+        """
         self.text.delete('1.0', tk.END)
         self._update_line_numbers()
 
     def _toggle_wrap(self):
-        """Toggle word wrap and update menu checkmark."""
+        """
+        Toggle word wrap setting.
+        
+        Switches between word wrap and no wrap modes and applies
+        the change immediately to the text widget.
+        """
         self.wrap.set(not self.wrap.get())
         self._apply_wrap()
-        # Update menu checkmark
-        if hasattr(self, 'view_menu'):
-            # Find the word wrap menu item and update it
-            pass  # Menu update will be handled by the menu system
     
     def _apply_wrap(self):
+        """
+        Apply word wrap setting to text widget.
+        
+        Configures the text widget to use word wrap or no wrap
+        based on the current setting.
+        """
         self.text.config(wrap=tk.WORD if self.wrap.get() else tk.NONE)
     
     def _change_theme(self, theme_name: str):
-        """Change the application theme."""
+        """
+        Change the application theme.
+        
+        Updates the theme manager and applies the new theme to all
+        UI elements. Updates menu checkmarks to reflect the change.
+        
+        Args:
+            theme_name: Name of the theme to apply
+        """
         if self.theme_manager.set_theme(theme_name):
             self._apply_theme()
             # Update theme menu checkmarks
@@ -1463,7 +1938,12 @@ class LogViewerApp(tk.Tk):
             self._set_status(f"Theme changed to {self.theme_manager.get_theme(theme_name)['name']}")
     
     def _apply_theme(self):
-        """Apply the current theme to all UI elements."""
+        """
+        Apply the current theme to all UI elements.
+        
+        Updates colors and styling for all interface components
+        including text widgets, toolbar, status bar, and menus.
+        """
         theme = self.theme_manager.get_current_theme()
         
         # Configure main window
@@ -1528,7 +2008,12 @@ class LogViewerApp(tk.Tk):
         self._save_filter_preferences()
     
     def _save_filter_preferences(self):
-        """Save current filter preferences to config file."""
+        """
+        Save current filter preferences to config file.
+        
+        Stores filter mode, case sensitivity, and other filter-related
+        settings for restoration on next launch.
+        """
         try:
             config_dir = os.path.expanduser("~/.logviewer")
             os.makedirs(config_dir, exist_ok=True)
@@ -1542,7 +2027,15 @@ class LogViewerApp(tk.Tk):
             pass  # Silently fail if we can't save preferences
     
     def _load_filter_preferences(self):
-        """Load saved filter preferences. Returns default if none saved."""
+        """
+        Load saved filter preferences.
+        
+        Restores previously saved filter settings including mode,
+        case sensitivity, and filter text.
+        
+        Returns:
+            Default values if no preferences are saved
+        """
         try:
             config_file = os.path.join(os.path.expanduser("~/.logviewer"), "filter_prefs.txt")
             if os.path.exists(config_file):
@@ -1560,7 +2053,11 @@ class LogViewerApp(tk.Tk):
             pass
     
     def _save_theme_preference(self):
-        """Save current theme preference to the configuration system."""
+        """
+        Save current theme preference to the configuration system.
+        
+        Stores the user's theme choice for restoration on next launch.
+        """
         try:
             self.config_manager.set('theme.current', self.theme_manager.current_theme)
             self.config_manager.save_config()
@@ -1568,7 +2065,12 @@ class LogViewerApp(tk.Tk):
             pass  # Silently fail if we can't save preferences
     
     def _load_theme_preference(self) -> str:
-        """Load saved theme preference from the configuration system."""
+        """
+        Load saved theme preference from the configuration system.
+        
+        Returns:
+            Saved theme name or default theme if none saved
+        """
         try:
             saved_theme = self.config_manager.get('theme.current', DEFAULT_THEME)
             if saved_theme in self.theme_manager.get_theme_names():
@@ -1578,7 +2080,12 @@ class LogViewerApp(tk.Tk):
         return DEFAULT_THEME
     
     def _cycle_theme(self):
-        """Cycle through available themes with keyboard shortcut."""
+        """
+        Cycle through available themes with keyboard shortcut.
+        
+        Allows users to quickly switch between themes using
+        Ctrl+T keyboard shortcut.
+        """
         themes = self.theme_manager.get_theme_names()
         current_index = themes.index(self.theme_manager.current_theme)
         next_index = (current_index + 1) % len(themes)
@@ -1586,7 +2093,12 @@ class LogViewerApp(tk.Tk):
         self._change_theme(next_theme)
     
     def _show_theme_info(self):
-        """Show information about available themes."""
+        """
+        Show information about available themes.
+        
+        Displays a dialog with list of available themes and
+        keyboard shortcuts for theme switching.
+        """
         info = "Available Themes:\n\n"
         for theme_name in self.theme_manager.get_theme_names():
             theme = self.theme_manager.get_theme(theme_name)
@@ -1598,7 +2110,12 @@ class LogViewerApp(tk.Tk):
         messagebox.showinfo("Theme Information", info)
     
     def _show_keyboard_shortcuts(self):
-        """Show available keyboard shortcuts."""
+        """
+        Show available keyboard shortcuts.
+        
+        Displays a dialog listing all available keyboard shortcuts
+        for quick reference.
+        """
         shortcuts = "Keyboard Shortcuts:\n\n"
         shortcuts += "Ctrl+O    - Open file\n"
         shortcuts += "Ctrl+T    - Cycle themes\n"
@@ -1611,7 +2128,12 @@ class LogViewerApp(tk.Tk):
         messagebox.showinfo("Keyboard Shortcuts", shortcuts)
     
     def _show_filter_help(self):
-        """Show help information for the filtering system."""
+        """
+        Show help information for the filtering system.
+        
+        Displays comprehensive help for all filter modes including
+        regex examples and usage tips.
+        """
         help_text = """Advanced Filtering System
 
 Filter Modes:
@@ -1643,7 +2165,12 @@ Tips:
         messagebox.showinfo("Filter Help", help_text)
     
     def _show_theme_preview(self):
-        """Show a preview of all available themes."""
+        """
+        Show a preview of all available themes.
+        
+        Creates a preview window showing color samples for each
+        theme with the ability to apply themes directly.
+        """
         preview_window = tk.Toplevel(self)
         preview_window.title("Theme Preview")
         preview_window.geometry("400x360")
@@ -1651,7 +2178,7 @@ Tips:
         preview_window.transient(self)
         preview_window.grab_set()
         
-        # Center the window
+        # Center the window relative to main application
         preview_window.geometry("+%d+%d" % (self.winfo_rootx() + 50, self.winfo_rooty() + 50))
         
         # Create preview for each theme
@@ -1667,27 +2194,27 @@ Tips:
             name_label = ttk.Label(theme_frame, text=f"{theme['name']}{current}")
             name_label.pack(anchor=tk.W)
             
-            # Color preview
+            # Color preview section
             preview_frame = tk.Frame(theme_frame, height=40)
             preview_frame.pack(fill=tk.X, pady=2)
             preview_frame.pack_propagate(False)
             
-            # Background color
+            # Background color sample
             bg_label = tk.Label(preview_frame, text="  Background  ", 
                                bg=theme["bg"], fg=theme["fg"], relief=tk.RAISED)
             bg_label.pack(side=tk.LEFT, padx=2)
             
-            # Text color
+            # Text color sample
             text_label = tk.Label(preview_frame, text="  Text  ", 
                                  bg=theme["text_bg"], fg=theme["text_fg"], relief=tk.RAISED)
             text_label.pack(side=tk.LEFT, padx=2)
             
-            # Button color
+            # Button color sample
             btn_label = tk.Label(preview_frame, text="  Button  ", 
                                 bg=theme["button_bg"], fg=theme["button_fg"], relief=tk.RAISED)
             btn_label.pack(side=tk.LEFT, padx=2)
             
-            # Apply button
+            # Apply button for this theme
             apply_btn = ttk.Button(theme_frame, text="Apply", 
                                   command=lambda t=theme_name: self._apply_theme_from_preview(t, preview_window))
             apply_btn.pack(anchor=tk.E, pady=2)
@@ -1697,16 +2224,36 @@ Tips:
         close_btn.pack(pady=10)
     
     def _apply_theme_from_preview(self, theme_name: str, preview_window):
-        """Apply theme from preview window and close it."""
+        """
+        Apply theme from preview window and close it.
+        
+        Args:
+            theme_name: Name of theme to apply
+            preview_window: Preview window to close
+        """
         self._change_theme(theme_name)
         preview_window.destroy()
     
     def _focus_filter(self):
-        """Focus the filter entry box."""
+        """
+        Focus the filter entry box.
+        
+        Moves keyboard focus to the filter entry field and selects
+        all text for easy replacement.
+        """
         self.filter_entry.focus_set()
         self.filter_entry.select_range(0, tk.END)
 
     def _set_status(self, msg: str):
+        """
+        Update the status bar with a message.
+        
+        Displays the current time, status message, and file size
+        information in the status bar at the bottom of the window.
+        
+        Args:
+            msg: Status message to display
+        """
         now = time.strftime("%H:%M:%S")
         base = "[{}] {}".format(now, msg)
         if self.path:
@@ -1718,6 +2265,12 @@ Tips:
         self.status.config(text=base)
 
     def _trim_if_needed(self):
+        """
+        Trim text widget content if it exceeds maximum lines.
+        
+        Removes older lines from the beginning of the text widget
+        to maintain performance and memory usage within limits.
+        """
         # Keep last N lines for memory safety
         try:
             max_lines = max(1000, int(self.max_lines.get() or MAX_LINES_DEFAULT))
@@ -1729,7 +2282,15 @@ Tips:
             self.text.delete('1.0', "{}.0".format(cutoff))
 
     def _append(self, s: str):
-        """Append new text to the display, applying current filter."""
+        """
+        Append new text to the display, applying current filter.
+        
+        Processes incoming text chunk by chunk, stores lines in buffer,
+        and displays only lines that match the current filter.
+        
+        Args:
+            s: New text content to append
+        """
         # Break incoming chunk into lines, store, and append only matching ones
         lines = s.splitlines(True)  # keep line endings
         if not lines:
@@ -1752,6 +2313,12 @@ Tips:
         self._update_line_numbers()
 
     def _poll(self):
+        """
+        Main polling loop for file updates.
+        
+        Checks for new content in the monitored file at regular intervals.
+        Handles errors gracefully and reschedules itself for continuous monitoring.
+        """
         try:
             if not self.paused.get() and self.tail and self.path:
                 new_text = self.tail.read_new_text()
@@ -1762,7 +2329,7 @@ Tips:
             # Non-fatal: show in status bar, keep polling
             self._set_status("Error: {}".format(e))
         finally:
-            # Reschedule
+            # Reschedule polling
             try:
                 interval = max(100, int(self.refresh_ms.get()))
             except Exception:
@@ -1770,7 +2337,12 @@ Tips:
             self.after(interval, self._poll)
 
     def _center_window(self):
-        """Centers the window on the screen."""
+        """
+        Center the window on the screen.
+        
+        Calculates the center position based on screen dimensions
+        and current window size, then moves the window to that position.
+        """
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         window_width = self.winfo_reqwidth()
@@ -1782,7 +2354,12 @@ Tips:
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
     def _set_app_icon(self):
-        """Sets the application icon based on the current theme."""
+        """
+        Set the application icon based on the current theme.
+        
+        Attempts to load a theme-specific icon file and falls back
+        to a default icon if the theme-specific one doesn't exist.
+        """
         try:
             current_theme = self.theme_manager.current_theme
             icon_path = os.path.join(os.path.dirname(__file__), "icons", f"{current_theme}.ico")
@@ -1799,19 +2376,43 @@ Tips:
             pass
 
     def _on_scroll(self, *args):
-        """Handle scrollbar events for the text widget."""
+        """
+        Handle scrollbar events for the text widget.
+        
+        Processes scrollbar commands and synchronizes scroll position
+        with line numbers display.
+        
+        Args:
+            *args: Scrollbar command arguments
+        """
         # Only call yview if args are valid scrollbar commands
         if args and args[0] in ['moveto', 'scroll']:
             self.text.yview(*args)
             self._sync_scroll()
     
     def _on_yscroll(self, *args):
-        """Handle vertical scrollbar events and update line numbers."""
+        """
+        Handle vertical scrollbar events and update line numbers.
+        
+        Processes vertical scrollbar movement and ensures line numbers
+        stay synchronized with the main text content.
+        
+        Args:
+            *args: Scrollbar command arguments
+        """
         self.text.yview(*args)
         self._sync_scroll()
 
     def _update_line_numbers(self, event=None):
-        """Update the line numbers display."""
+        """
+        Update the line numbers display.
+        
+        Refreshes the line numbers widget to show current line numbers.
+        Handles both filtered and unfiltered content appropriately.
+        
+        Args:
+            event: Tkinter event that triggered the update (optional)
+        """
         if not self.show_line_numbers.get():
             return
             
@@ -1844,7 +2445,12 @@ Tips:
             pass
     
     def _toggle_line_numbers(self):
-        """Toggle line numbers display."""
+        """
+        Toggle line numbers display.
+        
+        Shows or hides the line numbers widget based on user preference
+        and updates the display accordingly.
+        """
         if self.show_line_numbers.get():
             # Make line numbers visible and update them
             self.line_numbers.pack(side=tk.LEFT, fill=tk.Y, before=self.text)
@@ -1854,7 +2460,12 @@ Tips:
             self.line_numbers.pack_forget()
     
     def _sync_scroll(self):
-        """Synchronize scroll position between text and line numbers."""
+        """
+        Synchronize scroll position between text and line numbers.
+        
+        Ensures that the line numbers widget scrolls in sync with the
+        main text widget for consistent visual alignment.
+        """
         try:
             # Only sync if line numbers are visible
             if not self.show_line_numbers.get():
@@ -1874,7 +2485,15 @@ Tips:
             pass
 
     def _on_mouse_wheel(self, event):
-        """Handle mouse wheel events to scroll the text widget."""
+        """
+        Handle mouse wheel events to scroll the text widget.
+        
+        Processes mouse wheel scrolling on different platforms and
+        schedules line number updates with debouncing for smooth performance.
+        
+        Args:
+            event: Mouse wheel event
+        """
         # Cancel any pending scroll sync
         if hasattr(self, '_wheel_sync_job'):
             try:
@@ -1894,23 +2513,26 @@ Tips:
         # Use debouncing to prevent rapid updates during fast scrolling
         self._wheel_sync_job = self.after(20, self._sync_scroll)
 
-    def _reset_settings(self):
-        """Reset all settings to default values."""
-        if messagebox.askyesno("Reset Settings", 
-                              "Are you sure you want to reset all settings to default values?\n\nThis cannot be undone."):
-            self.config_manager.reset_to_defaults()
-            self._set_status("Settings reset to defaults")
-            messagebox.showinfo("Reset Complete", "All settings have been reset to default values.\n\nRestart the application to apply the changes.")
-
 
 def main():
+    """
+    Main entry point for the Log Viewer application.
+    
+    Parses command line arguments and launches the main application
+    with specified configuration options.
+    """
     parser = argparse.ArgumentParser(description="Simple GUI log viewer that tails a file.")
     parser.add_argument('--file', '-f', help='Path to the log file to open on launch')
-    parser.add_argument('--refresh', '-r', type=int, default=DEFAULT_REFRESH_MS, help='Refresh interval in milliseconds (default 500)')
-    parser.add_argument('--encoding', '-e', default=DEFAULT_ENCODING, help='File encoding (default auto; try utf-16 on Windows logs)')
-    parser.add_argument('--theme', '-t', default=DEFAULT_THEME, choices=['dark', 'light', 'sunset'], help='Color theme (default dark)')
+    parser.add_argument('--refresh', '-r', type=int, default=DEFAULT_REFRESH_MS, 
+                       help='Refresh interval in milliseconds (default 500)')
+    parser.add_argument('--encoding', '-e', default=DEFAULT_ENCODING, 
+                       help='File encoding (default auto; try utf-16 on Windows logs)')
+    parser.add_argument('--theme', '-t', default=DEFAULT_THEME, 
+                       choices=['dark', 'light', 'sunset'], 
+                       help='Color theme (default dark)')
     args = parser.parse_args()
 
+    # Create and launch the main application
     app = LogViewerApp(args.file, refresh_ms=args.refresh, encoding=args.encoding, theme=args.theme)
     if app.tail:
         app.tail.encoding = args.encoding
