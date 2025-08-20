@@ -26,6 +26,7 @@ MIN_WINDOW_WIDTH = 800
 MIN_WINDOW_HEIGHT = 600
 MAX_WINDOW_WIDTH = 3000
 MAX_WINDOW_HEIGHT = 2000
+LINE_NUMBER_WIDTH = 8              # Width of line numbers panel
 
 # Filter constants
 DEFAULT_FILTER_MODE = "contains"

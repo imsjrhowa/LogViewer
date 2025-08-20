@@ -19,7 +19,8 @@ from ..managers import ThemeManager, FilterManager, ConfigManager, FileManager
 from ..utils.constants import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION, APP_AUTHOR,
     MAX_LINES_DEFAULT, DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME,
-    FILTER_DEBOUNCE_MS, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT
+    FILTER_DEBOUNCE_MS, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT,
+    LINE_NUMBER_WIDTH
 )
 from .dialogs import SettingsDialog
 
@@ -319,8 +320,8 @@ class LogViewerApp(tk.Tk):
         # Line numbers widget (left side)
         self.line_numbers = tk.Text(
             text_content_frame,
-            width=8,                    # Fixed width for line numbers
-            padx=3,                     # Horizontal padding
+            width=LINE_NUMBER_WIDTH,    # Fixed width for line numbers
+            padx=3,                     # Left and right padding for better spacing
             pady=2,                     # Vertical padding
             relief=tk.FLAT,             # No border
             borderwidth=0,              # No border width
@@ -879,7 +880,10 @@ class LogViewerApp(tk.Tk):
                 self.line_numbers.delete('1.0', tk.END)
                 
                 for original_line_num, _ in self._filtered_lines:
-                    self.line_numbers.insert(tk.END, f"{original_line_num}\n")
+                    # Right-justify line numbers with proper formatting
+                    # Use LINE_NUMBER_WIDTH - 1 to account for the newline character
+                    formatted_line = f"{original_line_num:>{LINE_NUMBER_WIDTH - 1}}\n"
+                    self.line_numbers.insert(tk.END, formatted_line)
                 
                 self.line_numbers.config(state=tk.DISABLED)
             else:
@@ -890,7 +894,10 @@ class LogViewerApp(tk.Tk):
                 self.line_numbers.delete('1.0', tk.END)
                 
                 for i in range(1, lines + 1):
-                    self.line_numbers.insert(tk.END, f"{i}\n")
+                    # Right-justify line numbers with proper formatting
+                    # Use LINE_NUMBER_WIDTH - 1 to account for the newline character
+                    formatted_line = f"{i:>{LINE_NUMBER_WIDTH - 1}}\n"
+                    self.line_numbers.insert(tk.END, formatted_line)
                 
                 self.line_numbers.config(state=tk.DISABLED)
             
