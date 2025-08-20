@@ -8,10 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - Planned Features
 
 ### Added
-- **Syntax highlighting** for log levels and timestamps
+- **Comprehensive testing suite** for all components
+- **Performance optimization** for large file handling
+- **Enhanced filtering** with filter combinations and presets
 - **Multiple file tabs** for monitoring multiple logs simultaneously
 - **Search and replace** functionality with regex support
-- **Theme system** with light/dark mode toggle
 - **Plugin system** for extensible log format support
 
 ### Changed
@@ -30,6 +31,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - None currently
+
+## [2.0.0] - 2024-01-XX - Major Restructuring Release
+
+### Added
+- **Complete modular architecture** with clear separation of concerns
+- **Manager classes** for business logic separation:
+  - `ThemeManager` for theme management and color schemes
+  - `FilterManager` for advanced filtering system
+  - `ConfigManager` for configuration and preferences
+  - `FileManager` for file handling and monitoring
+- **Comprehensive settings dialog** with 5-tab interface
+- **Enhanced line number display** synchronized with filtering
+- **Improved theme system** with live previews and persistence
+- **Better error handling** and user feedback
+
+### Changed
+- **Complete code restructuring** from monolithic to modular design
+- **Package organization** with `src/` as main package
+- **Import structure** simplified and organized
+- **File handling** improved with better encoding detection
+- **Filter system** enhanced with better performance and validation
+- **Configuration management** centralized and improved
+
+### Technical Improvements
+- **Modular architecture** with `src/managers/`, `src/ui/`, `src/utils/`
+- **Clean separation** of UI, business logic, and utilities
+- **Improved maintainability** and code organization
+- **Better error handling** and graceful fallbacks
+- **Enhanced performance** with optimized filtering and file handling
+
+### User Interface
+- **Settings dialog** with comprehensive configuration options
+- **Improved theme switching** with live previews
+- **Better filter interface** with enhanced validation
+- **Line number display** with proper synchronization
+- **Enhanced toolbar** with additional controls
 
 ## [1.0.0] - 2024-01-XX - Initial Release
 
@@ -110,31 +147,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Status | Major Features |
 |---------|------|--------|----------------|
+| **2.0.0** | 2024-01-XX | ✅ Released | Complete modular restructuring, enhanced features |
 | **1.0.0** | 2024-01-XX | ✅ Released | Full feature set, production ready |
 | **0.9.0** | 2024-01-XX | 🔄 Beta | Core functionality, testing phase |
 | **0.8.0** | 2024-01-XX | 🔄 Alpha | Basic structure, development phase |
 
 ## Future Release Planning
 
-### Version 1.1.0 (Q1 2024)
-- **Syntax highlighting** for common log formats
-- **Multiple file tabs** basic implementation
-- **Search functionality** core features
-- **Theme system** basic implementation
+### Version 2.1.0 (Q1 2024)
+- **Comprehensive testing suite** implementation
+- **Performance optimization** for large files
+- **Enhanced filtering** capabilities
+- **Bug fixes and stability** improvements
 
-### Version 1.2.0 (Q2 2024)
+### Version 2.2.0 (Q2 2024)
+- **Multiple file tabs** basic functionality
+- **Search functionality** core features
 - **Plugin system** architecture
 - **Remote file support** basic implementation
+
+### Version 2.3.0 (Q3 2024)
+- **CustomTkinter** migration
+- **Advanced UI features** (responsive design, accessibility)
 - **Statistics dashboard** core features
 - **Export functionality** basic implementation
 
-### Version 1.3.0 (Q3 2024)
-- **CustomTkinter** migration
-- **Advanced UI features** (responsive design, accessibility)
-- **Database backend** basic implementation
-- **Alert system** core functionality
-
-### Version 2.0.0 (Q4 2024)
+### Version 3.0.0 (Q4 2024)
 - **Major UI overhaul** with modern framework
 - **Advanced plugin** ecosystem
 - **Enterprise features** (LDAP, SSO)
@@ -142,24 +180,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Breaking Changes
 
-### Version 1.0.0
-- **None** - Initial release
+### Version 2.0.0
+- **Complete restructuring** from monolithic to modular architecture
+- **Import changes** - new package structure requires updated imports
+- **File organization** - source code moved to `src/` directory
+- **Launch method** - now use `python run.py` instead of `python FileUpdater.py`
 
 ### Future Versions
-- **Version 2.0.0** may include breaking changes for plugin system
+- **Version 2.x** releases will maintain backward compatibility
+- **Version 3.0.0** may include breaking changes for plugin system
 - **CustomTkinter migration** may require UI adjustments
-- **Database backend** may change file handling behavior
 
 ## Migration Guide
 
+### From Version 1.0.0 to 2.0.0
+- **Launch method changed**: Use `python run.py` instead of `python FileUpdater.py`
+- **Import structure updated**: All imports now use the new modular structure
+- **Configuration preserved**: All user settings and preferences are maintained
+- **Functionality unchanged**: All features work exactly the same
+
 ### From Beta/Alpha Versions
-- **No migration required** - 1.0.0 is fully compatible
-- **Settings and preferences** are preserved
-- **File handling** remains unchanged
+- **Major upgrade required**: Significant changes in architecture and organization
+- **Settings migration**: May need to reconfigure some preferences
+- **File handling**: Core functionality remains the same
 
 ### Future Versions
-- **Version 1.x** releases will maintain backward compatibility
-- **Version 2.0.0** will include migration tools and guides
+- **Version 2.x** releases will maintain backward compatibility
+- **Version 3.0.0** will include migration tools and guides
 - **Plugin system** will have compatibility layers for existing configurations
 
 ## Contributing to Changelog

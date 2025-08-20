@@ -13,21 +13,24 @@ A powerful, cross-platform GUI application for monitoring log files in real-time
 # Clone or download the project
 cd FileUpdater
 
-# Run the application
-python FileUpdater.py
+# Run the application (Recommended)
+python run.py
+
+# Or run from the source directory
+python src/main.py
 
 # Or open a specific log file
-python FileUpdater.py --file /path/to/your/log.txt
+python run.py --file /path/to/your/log.txt
 
 # Customize refresh rate (in milliseconds)
-python FileUpdater.py --file log.txt --refresh 1000
+python run.py --file log.txt --refresh 1000
 
 # Specify encoding
-python FileUpdater.py --file log.txt --encoding utf-16
+python run.py --file log.txt --encoding utf-16
 
 # Choose a theme
-python FileUpdater.py --theme light
-python FileUpdater.py --theme sunset
+python run.py --theme light
+python run.py --theme sunset
 ```
 
 ## ✨ Key Features
@@ -40,19 +43,40 @@ python FileUpdater.py --theme sunset
 - **Multiple color themes** (Dark, Light, Sunset) with easy switching
 - **Comprehensive configuration system** with persistent user preferences
 - **Cross-platform** support (Windows, macOS, Linux)
+- **Modular architecture** for easy maintenance and extension
 
 ## 📁 File Structure
 
 ```
 FileUpdater/
-├── FileUpdater.py          # Main application file
+├── src/                      # ✅ Modular source code
+│   ├── __init__.py          # Main package
+│   ├── main.py              # ✅ Application entry point
+│   ├── managers/            # ✅ Business logic managers
+│   │   ├── __init__.py
+│   │   ├── theme_manager.py
+│   │   ├── filter_manager.py
+│   │   ├── config_manager.py
+│   │   └── file_manager.py
+│   ├── ui/                  # ✅ User interface components
+│   │   ├── __init__.py
+│   │   ├── main_window.py   # ✅ Complete main application
+│   │   └── dialogs/         # ✅ Dialog windows
+│   │       ├── __init__.py
+│   │       └── settings_dialog.py
+│   └── utils/               # ✅ Utility modules
+│       ├── __init__.py
+│       └── constants.py
+├── run.py                   # ✅ Launcher script (recommended)
+├── FileUpdater.py          # Original monolithic file (preserved)
 ├── FileUpdater.code-workspace  # VS Code workspace
-└── Docs/                   # Documentation folder
-    ├── README.md           # This file
-    ├── USER_GUIDE.md       # Detailed user instructions
-    ├── DEVELOPER_GUIDE.md  # Development and contribution guide
-    ├── FEATURES.md         # Complete feature documentation
-    └── CHANGELOG.md        # Version history and changes
+├── icons/                   # Theme-specific icons
+└── Docs/                    # Documentation folder
+    ├── README.md            # This file
+    ├── USER_GUIDE.md        # Detailed user instructions
+    ├── DEVELOPER_GUIDE.md   # Development and contribution guide
+    ├── FEATURES.md          # Complete feature documentation
+    └── CHANGELOG.md         # Version history and changes
 ```
 
 ## 🔧 Command Line Options
@@ -63,6 +87,15 @@ FileUpdater/
 | `--refresh` | `-r` | Refresh interval in milliseconds | 500 |
 | `--encoding` | `-e` | File encoding (auto/utf-8/utf-16/etc.) | auto |
 | `--theme` | `-t` | Color theme (dark/light/sunset) | dark |
+
+## 🏗️ Architecture
+
+The application now uses a **modular architecture** with clear separation of concerns:
+
+- **`managers/`** - Business logic (themes, filtering, configuration, file handling)
+- **`ui/`** - User interface components and dialogs
+- **`utils/`** - Shared constants and utilities
+- **`main.py`** - Application entry point and CLI parsing
 
 ## 📖 Documentation
 
@@ -77,7 +110,7 @@ See [Developer Guide](DEVELOPER_GUIDE.md) for information on contributing to thi
 
 ## 📄 License
 
-This project is open source. Feel free to use, modify, and distribute.
+This project is open source. Free to use, modify, and distribute.
 
 ---
 

@@ -14,12 +14,13 @@ Technical documentation for developers who want to understand, modify, or contri
 
 ## 🏗️ Architecture Overview
 
-The Log Viewer follows a **Model-View-Controller (MVC)** pattern with these main components:
+The Log Viewer now follows a **modular architecture** with clear separation of concerns:
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   GUI Layer     │    │  File Handler   │    │  Polling Engine │
-│  (Tkinter)     │◄──►│  (TailReader)   │◄──►│  (Timer-based)  │
+│   UI Layer      │    │  Managers       │    │  Utils          │
+│  (Tkinter)     │◄──►│  (Business      │◄──►│  (Constants,    │
+│                 │    │   Logic)        │    │   Helpers)      │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
@@ -31,10 +32,12 @@ The Log Viewer follows a **Model-View-Controller (MVC)** pattern with these main
 ```
 
 ### Design Principles
-- **Separation of Concerns:** UI, file handling, and polling are separate
+- **Separation of Concerns:** UI, business logic, and utilities are separate
+- **Modular Design:** Each component has a single responsibility
 - **Memory Efficiency:** Bounded buffers prevent memory leaks
 - **Error Resilience:** Graceful handling of file system issues
 - **Cross-Platform:** Uses only standard library components
+- **Maintainability:** Clean, organized code structure
 
 ## 🛠️ Development Setup
 
@@ -53,11 +56,14 @@ cd FileUpdater
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install development dependencies (if any)
-pip install -r requirements-dev.txt  # Future: when we add dev deps
+# Run the application (Recommended)
+python run.py
 
-# Run the application
-python FileUpdater.py
+# Or run from source
+python src/main.py
+
+# Or direct module execution
+python -m src.main
 ```
 
 ### IDE Configuration
@@ -67,41 +73,92 @@ python FileUpdater.py
 
 ## 🏛️ Code Structure
 
-### File Organization
+### New Modular Organization
 ```
-FileUpdater.py          # Main application file
-├── Imports & Constants
-├── TailReader Class    # File handling logic
-├── LogViewerApp Class  # Main GUI application
-└── Main Function       # Entry point & CLI parsing
+src/                           # Main package
+├── __init__.py               # Package metadata
+├── main.py                   # Application entry point & CLI parsing
+├── managers/                 # Business logic managers
+│   ├── __init__.py          # Manager exports
+│   ├── theme_manager.py     # Theme management & color schemes
+│   ├── filter_manager.py    # Advanced filtering system
+│   ├── config_manager.py    # Configuration & preferences
+│   └── file_manager.py      # File handling & monitoring
+├── ui/                      # User interface components
+│   ├── __init__.py          # UI exports
+│   ├── main_window.py       # Main application window
+│   └── dialogs/             # Dialog windows
+│       ├── __init__.py      # Dialog exports
+│       └── settings_dialog.py # Comprehensive settings dialog
+└── utils/                   # Utility modules
+    ├── __init__.py          # Utility exports
+    └── constants.py         # Application constants & defaults
 ```
 
-### Key Constants
-```python
-MAX_LINES_DEFAULT = 10_000      # Default line limit
-DEFAULT_REFRESH_MS = 500        # Default refresh rate
-DEFAULT_ENCODING = "auto"       # Default encoding detection
-```
+### Legacy File
+- **`FileUpdater.py`** - Original monolithic file (preserved for reference)
 
 ## 🔧 Key Classes
 
-### TailReader Class
-**Purpose:** Efficiently reads growing text files with smart encoding detection.
+### ThemeManager Class
+**Purpose:** Manages application color themes and visual appearance.
 
 **Key Methods:**
-- `open(start_at_end=True)`: Opens file and positions cursor
+- `get_theme_names()`: Returns available theme names
+- `get_theme(theme_name)`: Retrieves theme color scheme
+- `set_theme(theme_name)`: Applies a specific theme
+
+**Features:**
+- Three built-in themes: Dark, Light, Sunset
+- Theme persistence across sessions
+- Consistent color scheme management
+
+### FilterManager Class
+**Purpose:** Handles advanced log filtering with multiple modes and regex support.
+
+**Key Methods:**
+- `set_filter(pattern, mode, case_sensitive)`: Sets filter criteria
+- `match_line(line)`: Checks if line matches current filter
+- `get_mode_names()`: Returns available filter modes
+- `add_to_history(pattern)`: Manages filter history
+
+**Features:**
+- Six filter modes: Contains, Starts With, Ends With, Regex, Exact Match, Not Contains
+- Regular expression support with validation
+- Case sensitivity control
+- Filter history management (last 20 filters)
+
+### ConfigManager Class
+**Purpose:** Manages application configuration and user preferences.
+
+**Key Methods:**
+- `load_config()`: Loads configuration from file
+- `save_config()`: Saves current configuration
+- `get_setting(key)`: Retrieves specific setting
+- `set_setting(key, value)`: Updates specific setting
+- `export_config()`: Exports configuration to file
+- `import_config()`: Imports configuration from file
+
+**Features:**
+- Window geometry and state persistence
+- Theme preferences
+- Filter settings and history
+- Display options (line numbers, word wrap, auto-scroll)
+- Performance settings (refresh rate, max lines)
+
+### FileManager Class
+**Purpose:** Handles file reading, monitoring, and encoding detection.
+
+**Key Methods:**
+- `open_file(path, encoding)`: Opens and monitors a file
 - `read_new_text()`: Reads only new content since last read
 - `_check_rotation_or_truncate()`: Detects file changes
 
-**Encoding Detection Logic:**
-1. **BOM Detection:** Check for UTF-16/UTF-8 byte order marks
-2. **Heuristic Fallback:** Detect UTF-16 by NUL byte frequency
-3. **Safe Fallback:** Use UTF-8 with error replacement
-
-**File Rotation Handling:**
-- **Inode Tracking:** Monitor device/inode changes
-- **Size Checking:** Detect truncation events
-- **Automatic Recovery:** Reopen file when needed
+**Features:**
+- Automatic encoding detection (BOM, UTF-16 heuristics)
+- File rotation and truncation handling
+- Efficient tailing of growing files
+- Cross-platform file handling
 
 ### LogViewerApp Class
 **Purpose:** Main GUI application managing the user interface and coordination.
@@ -111,11 +168,21 @@ DEFAULT_ENCODING = "auto"       # Default encoding detection
 - **Text Widget:** Main display area for log content
 - **Status Bar:** Real-time status and file information
 - **Menu System:** File operations and application control
+- **Line Numbers:** Synchronized line number display
 
 **State Management:**
 - **File State:** Current file path and reader
 - **UI State:** Pause, filter, wrap, scroll settings
 - **Buffer State:** Line storage and filtering
+
+### SettingsDialog Class
+**Purpose:** Comprehensive settings interface for application configuration.
+
+**Features:**
+- Five-tab interface: Display, Performance, Themes, Filtering, File Handling
+- Live previews for theme changes
+- Real-time configuration updates
+- Import/export functionality
 
 ## 🔍 Advanced Implementation Details
 
@@ -134,14 +201,14 @@ def _buffer_trim(self):
 
 ### Filtering System
 ```python
-# Debounced filtering with 150ms delay
+# Debounced filtering with 300ms delay
 def _on_filter_change(self):
     if self._filter_job is not None:
         try:
             self.after_cancel(self._filter_job)
         except Exception:
             pass
-    self._filter_job = self.after(150, self._rebuild_view)
+    self._filter_job = self.after(300, self._rebuild_view)
 ```
 
 ### Polling Engine
@@ -199,44 +266,44 @@ type(scope): description
 
 ### Running Tests
 ```bash
-# Run all tests
-python -m pytest tests/
+# Test the modular structure
+python test_modular.py  # (if you recreate the test file)
 
-# Run specific test file
-python -m pytest tests/test_tail_reader.py
+# Run specific modules
+python -c "from src.managers import ThemeManager; print('Import successful')"
 
-# Run with coverage
-python -m pytest --cov=FileUpdater tests/
+# Test the application
+python run.py --help
 ```
 
 ### Test Structure
 ```
-tests/
-├── test_tail_reader.py      # File handling tests
-├── test_log_viewer_app.py   # GUI application tests
-├── test_integration.py      # End-to-end tests
-└── fixtures/                # Test data and files
+# Current testing approach
+- Manual testing of the modular structure
+- Import verification for all modules
+- Basic functionality testing of managers
+- Application launch testing
 ```
 
 ### Test Categories
-- **Unit Tests:** Individual class/method testing
-- **Integration Tests:** Component interaction testing
-- **Performance Tests:** Large file handling
-- **Platform Tests:** Cross-platform compatibility
+- **Import Tests:** Verify all modules can be imported
+- **Functionality Tests:** Basic manager operations
+- **Integration Tests:** Component interaction
+- **Application Tests:** End-to-end functionality
 
 ## 🚀 Future Improvements
 
 ### High Priority
-1. **Syntax Highlighting:** Support for common log formats
-2. **Multiple File Tabs:** Monitor multiple logs simultaneously
-3. **Search & Replace:** Advanced text search functionality
-4. **Custom Themes:** Light/dark mode toggle
+1. **Comprehensive Testing Suite:** Unit tests, integration tests, performance tests
+2. **Performance Optimization:** Large file handling, memory management
+3. **Enhanced Filtering:** Advanced regex, filter combinations
+4. **Plugin System:** Extensible architecture for custom features
 
 ### Medium Priority
-1. **Plugin System:** Extensible log format support
-2. **Remote File Support:** SSH, FTP, HTTP log monitoring
-3. **Statistics Dashboard:** Log analysis and metrics
-4. **Export Functionality:** Save filtered results
+1. **Multiple File Tabs:** Monitor multiple logs simultaneously
+2. **Search & Replace:** Advanced text search functionality
+3. **Custom Themes:** User-defined color schemes
+4. **Remote File Support:** SSH, FTP, HTTP log monitoring
 
 ### Low Priority
 1. **CustomTkinter UI:** Modern-looking interface
@@ -246,15 +313,15 @@ tests/
 
 ### Implementation Roadmap
 ```
-Phase 1: Core Improvements (1-2 months)
-├── Syntax highlighting
-├── Multiple file tabs
-└── Search functionality
+Phase 1: Testing & Optimization (1-2 months)
+├── Comprehensive testing suite
+├── Performance optimization
+└── Bug fixes and stability
 
 Phase 2: Advanced Features (2-3 months)
-├── Plugin system
-├── Remote file support
-└── Statistics dashboard
+├── Multiple file tabs
+├── Enhanced search functionality
+└── Plugin system architecture
 
 Phase 3: Modern UI (3-4 months)
 ├── CustomTkinter migration

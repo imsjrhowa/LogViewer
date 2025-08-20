@@ -14,15 +14,17 @@ Comprehensive documentation of all current features and planned improvements for
 ### 🖥️ User Interface
 
 #### Main Window
-- **Resizable window** with minimum size constraints (640x360)
+- **Resizable window** with minimum size constraints (800x600)
 - **Default size** of 1000x640 pixels
 - **Dark theme** by default for easy reading
 - **Cross-platform** compatibility (Windows, macOS, Linux)
+- **Modular architecture** for easy maintenance and extension
 
 #### Menu System
 - **File menu** with Open and Exit options
-- **Keyboard shortcuts** support (Ctrl+O for Open)
-- **Standard menu bar** layout
+- **View menu** with Theme selection and display options
+- **Settings menu** with Preferences, Save as Default, and Import/Export
+- **Keyboard shortcuts** support (Ctrl+O for Open, Ctrl+T for theme cycling)
 
 #### Toolbar Controls
 - **File path display** showing current log file
@@ -32,27 +34,31 @@ Comprehensive documentation of all current features and planned improvements for
 - **Max lines control** (1,000 to 200,000 lines)
 - **Pause/Resume button** for stopping/starting updates
 - **Clear button** for clearing display
+- **Line numbers toggle** for easy navigation
+- **Theme preview button** (🎨) for quick theme switching
 
 #### Enhanced Filtering System
 - **Six filter modes**: Contains, Starts With, Ends With, Regex, Exact Match, Not Contains
 - **Regular expression support** with syntax validation and error handling
 - **Case-sensitive toggle** for precise matching
 - **Filter history** with dropdown access (last 20 filters)
-- **Debounced input** (150ms delay) for performance
+- **Debounced input** (300ms delay) for performance
 - **Visual status indicators** showing filter state and errors
 - **Filter preferences persistence** across sessions
 
 #### Text Display
 - **Monospaced font** (Consolas on Windows, Menlo on macOS)
-- **Multiple color themes** (Dark, Light, Sunset)
+- **Multiple color themes** (Dark, Light, Sunset) with live switching
 - **Scrollbar** for navigation through content
 - **Line-based display** with proper line endings
+- **Line numbers** synchronized with filtering and content
 
 #### Status Bar
 - **Timestamp** showing current time
 - **Status message** (Opened, Updated, Paused, etc.)
 - **File size** in bytes with formatting
 - **Error messages** when issues occur
+- **Filter status** showing current filter mode and pattern
 
 ### 📁 File Handling
 
@@ -102,23 +108,59 @@ Comprehensive documentation of all current features and planned improvements for
 - **`--file` / `-f`**: Specify log file to open
 - **`--refresh` / `-r`**: Set refresh interval in milliseconds
 - **`--encoding` / `-e`**: Override automatic encoding detection
+- **`--theme` / `-t`**: Set initial theme (dark/light/sunset)
 
 #### Runtime Controls
 - **Dynamic refresh rate** adjustment via UI
 - **Runtime line limit** changes
 - **Filter settings** persistence during session
-- **View preferences** (wrap, scroll, etc.)
+- **View preferences** (wrap, scroll, line numbers, etc.)
+
+#### Settings Dialog
+- **Comprehensive 5-tab interface** for all configuration
+- **Display settings**: Line numbers, word wrap, auto-scroll
+- **Performance settings**: Refresh rate, max lines, memory management
+- **Theme settings**: Theme selection with live previews
+- **Filtering settings**: Default filter mode, case sensitivity
+- **File handling settings**: Encoding preferences, file monitoring options
+
+### 🎨 Theme System
+
+#### Built-in Themes
+- **Dark Theme**: Professional dark interface with high contrast
+- **Light Theme**: Clean light interface for bright environments
+- **Sunset Theme**: Warm purple/orange theme for extended use
+
+#### Theme Features
+- **Live preview** with color samples
+- **Automatic persistence** across sessions
+- **Quick switching** with Ctrl+T keyboard shortcut
+- **Menu-based** theme selection
+- **Consistent color schemes** across all UI elements
 
 ## 🚀 Planned Features
 
 ### 🔴 High Priority (Phase 1: 1-2 months)
 
-#### Syntax Highlighting
-- **Log level highlighting** (ERROR, WARNING, INFO, DEBUG)
-- **Timestamp highlighting** for common log formats
-- **IP address highlighting** for network logs
-- **Customizable color schemes** for different log types
-- **Performance-optimized** rendering for large files
+#### Comprehensive Testing Suite
+- **Unit tests** for all manager classes
+- **Integration tests** for component interaction
+- **Performance tests** for large file handling
+- **Cross-platform testing** automation
+
+#### Performance Optimization
+- **Large file handling** improvements (10GB+ support)
+- **Memory usage optimization** for high-line-count scenarios
+- **Update latency reduction** (target: 50ms minimum)
+- **CPU usage optimization** (target: <2% during normal operation)
+
+#### Enhanced Filtering
+- **Filter combinations** (AND/OR logic)
+- **Advanced regex** features and validation
+- **Filter presets** for common use cases
+- **Filter export/import** functionality
+
+### 🟡 Medium Priority (Phase 2: 2-3 months)
 
 #### Multiple File Tabs
 - **Tabbed interface** for monitoring multiple logs
@@ -134,21 +176,14 @@ Comprehensive documentation of all current features and planned improvements for
 - **Search history** and bookmarks
 - **Highlighted search results**
 
-#### Theme System
-- **Three built-in themes** (Dark, Light, Sunset)
-- **Live theme preview** with color samples
-- **Theme persistence** across sessions
-- **Keyboard shortcuts** for quick switching
-- **Menu-based** theme selection
-
-### 🟡 Medium Priority (Phase 2: 2-3 months)
-
 #### Plugin System
 - **Extensible architecture** for custom log formats
 - **Plugin API** for developers
 - **Built-in plugins** for common formats (JSON, XML, CSV)
 - **Plugin management** interface
 - **Community plugin** repository
+
+### 🟢 Low Priority (Phase 3: 3-4 months)
 
 #### Remote File Support
 - **SSH file access** for remote servers
@@ -157,22 +192,6 @@ Comprehensive documentation of all current features and planned improvements for
 - **Authentication** management
 - **Connection pooling** for efficiency
 
-#### Statistics Dashboard
-- **Line count metrics** (total, filtered, new)
-- **Error rate analysis** (if log levels detected)
-- **Performance metrics** (update frequency, memory usage)
-- **File size monitoring** and growth tracking
-- **Export capabilities** for metrics
-
-#### Export Functionality
-- **Filtered content export** to various formats
-- **Timestamp-based** export ranges
-- **Format options** (TXT, CSV, JSON)
-- **Batch export** for multiple files
-- **Export scheduling** and automation
-
-### 🟢 Low Priority (Phase 3: 3-4 months)
-
 #### Modern UI Framework
 - **CustomTkinter** migration for modern appearance
 - **Responsive design** for different screen sizes
@@ -180,26 +199,12 @@ Comprehensive documentation of all current features and planned improvements for
 - **Accessibility improvements** (screen reader support)
 - **Internationalization** (i18n) support
 
-#### Database Backend
-- **SQLite integration** for log storage
-- **Indexed searching** for large datasets
-- **Query language** for complex filtering
-- **Data compression** for storage efficiency
-- **Backup and restore** functionality
-
-#### Alert System
-- **Pattern-based alerts** for specific log entries
-- **Notification system** (desktop, email, webhook)
-- **Alert rules** and conditions
-- **Alert history** and management
-- **Integration** with monitoring systems
-
-#### Log Parsing
-- **Structured log format** support
-- **JSON log parsing** with field extraction
-- **XML log parsing** for enterprise systems
-- **Custom format** definition language
-- **Parsed field** display and filtering
+#### Advanced Analytics
+- **Statistics dashboard** with real-time metrics
+- **Log analysis** tools and pattern recognition
+- **Export functionality** for filtered results
+- **Alert system** for pattern-based notifications
+- **Performance monitoring** and reporting
 
 ## 📊 Feature Comparison
 
@@ -209,10 +214,11 @@ Comprehensive documentation of all current features and planned improvements for
 |------------------|---------|---------|----------|
 | **Basic Viewing** | ✅ Complete | 🔄 Enhanced | High |
 | **File Handling** | ✅ Complete | 🔄 Extended | Medium |
-| **Filtering** | ✅ Basic | 🔄 Advanced | High |
+| **Filtering** | ✅ Advanced | 🔄 Enhanced | High |
 | **UI/UX** | ✅ Functional | 🔄 Modern | Medium |
 | **Performance** | ✅ Good | 🔄 Excellent | High |
-| **Extensibility** | ❌ None | 🔄 Plugin System | Medium |
+| **Extensibility** | ✅ Modular | 🔄 Plugin System | Medium |
+| **Testing** | ❌ Basic | 🔄 Comprehensive | High |
 
 ### Competitive Analysis
 
@@ -226,6 +232,8 @@ Comprehensive documentation of all current features and planned improvements for
 | **File rotation** | ✅ | ❌ | ❌ | ❌ |
 | **Memory efficient** | ✅ | ❌ | ❌ | ✅ |
 | **No dependencies** | ✅ | ❌ | ❌ | ✅ |
+| **Modular architecture** | ✅ | ❌ | ❌ | ❌ |
+| **Theme system** | ✅ | ❌ | ❌ | ❌ |
 
 ## 🔧 Technical Specifications
 
@@ -284,22 +292,22 @@ Comprehensive documentation of all current features and planned improvements for
 ## 📈 Feature Roadmap Timeline
 
 ### Q1 2024 (Phase 1)
-- **Syntax highlighting** implementation
-- **Multiple file tabs** basic functionality
-- **Search functionality** core features
-- **Theme system** basic implementation
+- **Comprehensive testing suite** implementation
+- **Performance optimization** for large files
+- **Enhanced filtering** capabilities
+- **Bug fixes and stability** improvements
 
 ### Q2 2024 (Phase 2)
+- **Multiple file tabs** basic functionality
+- **Search functionality** core features
 - **Plugin system** architecture
 - **Remote file support** basic implementation
-- **Statistics dashboard** core features
-- **Export functionality** basic implementation
 
 ### Q3 2024 (Phase 3)
 - **CustomTkinter** migration
 - **Advanced UI features** (responsive design, accessibility)
-- **Database backend** basic implementation
-- **Alert system** core functionality
+- **Statistics dashboard** core features
+- **Export functionality** basic implementation
 
 ### Q4 2024 (Phase 4)
 - **Advanced plugin** ecosystem

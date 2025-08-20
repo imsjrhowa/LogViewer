@@ -4,7 +4,7 @@ Welcome to the complete documentation for the Log Viewer application. This index
 
 ## 📚 Documentation Overview
 
-The Log Viewer is a powerful, cross-platform GUI application for monitoring log files in real-time. It features advanced filtering, encoding detection, and memory-efficient file handling.
+The Log Viewer is a powerful, cross-platform GUI application for monitoring log files in real-time. It features advanced filtering, encoding detection, and memory-efficient file handling. The application now uses a **modular architecture** for improved maintainability and extensibility.
 
 ## 🗂️ Documentation Structure
 
@@ -38,11 +38,14 @@ The Log Viewer is a powerful, cross-platform GUI application for monitoring log 
 
 ### Key Features
 - ✅ **Real-time monitoring** with configurable refresh rates
-- ✅ **Live filtering** with case-sensitive toggle
+- ✅ **Live filtering** with case-sensitive toggle and 6 filter modes
 - ✅ **Auto-encoding detection** for multiple formats
 - ✅ **File rotation handling** with automatic recovery
 - ✅ **Memory efficient** with bounded line buffers
 - ✅ **Cross-platform** (Windows, macOS, Linux)
+- ✅ **Modular architecture** for easy maintenance and extension
+- ✅ **Comprehensive settings dialog** with 5-tab interface
+- ✅ **Enhanced theme system** with live previews
 
 ### System Requirements
 - **Python:** 3.6 or higher
@@ -51,23 +54,50 @@ The Log Viewer is a powerful, cross-platform GUI application for monitoring log 
 
 ### Quick Commands
 ```bash
-# Basic run
-python FileUpdater.py
+# Basic run (Recommended)
+python run.py
+
+# Alternative launch methods
+python src/main.py
+python -m src.main
 
 # Open specific file
-python FileUpdater.py --file log.txt
+python run.py --file log.txt
 
 # Custom refresh rate
-python FileUpdater.py --file log.txt --refresh 1000
+python run.py --file log.txt --refresh 1000
 
 # Specify encoding
-python FileUpdater.py --file log.txt --encoding utf-16
+python run.py --file log.txt --encoding utf-16
+
+# Choose theme
+python run.py --theme light
+```
+
+## 🏗️ Architecture Overview
+
+The application now uses a **modular architecture** with clear separation of concerns:
+
+```
+src/                           # Main package
+├── managers/                  # Business logic managers
+│   ├── theme_manager.py      # Theme management
+│   ├── filter_manager.py     # Advanced filtering
+│   ├── config_manager.py     # Configuration
+│   └── file_manager.py       # File handling
+├── ui/                       # User interface components
+│   ├── main_window.py        # Main application
+│   └── dialogs/              # Dialog windows
+└── utils/                    # Utility modules
+    └── constants.py          # Application constants
 ```
 
 ## 🔗 External Resources
 
 ### Project Links
-- **Source Code:** Main application file (`FileUpdater.py`)
+- **Source Code:** Modular source code in `src/` directory
+- **Launcher:** `run.py` script for easy execution
+- **Legacy:** Original `FileUpdater.py` (preserved for reference)
 - **Workspace:** VS Code workspace configuration
 - **Documentation:** This `Docs/` folder
 
@@ -129,6 +159,7 @@ python FileUpdater.py --file log.txt --encoding utf-16
 - **Development:** [Developer Guide](DEVELOPER_GUIDE.md) → Development Setup
 - **Features:** [Features](FEATURES.md) → Current Features
 - **Roadmap:** [Features](FEATURES.md) → Planned Features
+- **Architecture:** [Developer Guide](DEVELOPER_GUIDE.md) → Architecture Overview
 
 ---
 

@@ -1,0 +1,24 @@
+# Log Viewer Application Dependencies
+# This application uses only Python standard library modules
+# No external dependencies are required
+
+# Python version requirement
+# Python 3.6+ is required for f-strings and type hints
+
+# Standard library modules used:
+# - tkinter (GUI framework)
+# - os (file and path operations)
+# - sys (system-specific parameters)
+# - json (configuration file handling)
+# - re (regular expressions for filtering)
+# - collections (deque for efficient line buffering)
+# - time (timestamp formatting)
+# - io (file I/O operations)
+# - argparse (command line argument parsing)
+# - typing (type hints)
+
+# Optional: For development and testing
+# pytest>=6.0.0
+# black>=21.0.0
+# flake8>=3.8.0
+# mypy>=0.800

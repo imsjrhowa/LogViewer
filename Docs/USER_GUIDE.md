@@ -13,26 +13,36 @@ Complete guide to using the Log Viewer application for monitoring log files in r
 ## 🚀 Getting Started
 
 ### First Launch
-1. **Run the application:**
+1. **Run the application (Recommended):**
    ```bash
-   python FileUpdater.py
+   python run.py
    ```
 
-2. **Open a log file:**
+2. **Alternative launch methods:**
+   ```bash
+   # From source directory
+   python src/main.py
+   
+   # Direct module execution
+   python -m src.main
+   ```
+
+3. **Open a log file:**
    - Use **File → Open…** from the menu
    - Or drag and drop a log file onto the application
-   - Or use command line: `python FileUpdater.py --file log.txt`
+   - Or use command line: `python run.py --file log.txt`
 
-3. **The interface will show:**
+4. **The interface will show:**
    - **Toolbar** with controls and file path
    - **Text area** displaying log content
    - **Status bar** showing current status and file size
+   - **Line numbers** (toggleable) for easy navigation
 
 ## 🔧 Basic Operations
 
 ### Opening Files
 - **Menu method:** File → Open… → Navigate to your log file
-- **Command line:** `python FileUpdater.py --file /path/to/log.txt`
+- **Command line:** `python run.py --file /path/to/log.txt`
 - **Supported formats:** Any text-based log file (`.txt`, `.log`, `.out`, etc.)
 
 ### Viewing Controls
@@ -40,6 +50,7 @@ Complete guide to using the Log Viewer application for monitoring log files in r
 - **Clear:** Remove all displayed content (doesn't affect the file)
 - **Auto-scroll:** Keep checked to automatically scroll to new content
 - **Word Wrap:** Toggle between wrapped and unwrapped text display
+- **Line Numbers:** Toggle line number display for easy reference
 
 ### Theme Selection
 - **View → Theme** menu to choose from available themes
@@ -47,11 +58,12 @@ Complete guide to using the Log Viewer application for monitoring log files in r
 - **Light theme** - Classic light background for bright environments
 - **Sunset theme** - Warm purple and cream colors for a unique look
 - **Theme persistence** - Your choice is remembered between sessions
+- **Quick switching** - Use Ctrl+T to cycle through themes
 
 ### Configuration & Settings
-- **Settings → Preferences...** for comprehensive configuration
-- **Save Current Settings as Default** to make current setup permanent
-- **Export/Import Settings** for backup and sharing configurations
+- **Settings → Preferences...** for comprehensive configuration dialog
+- **Settings → Save Current Settings as Default** to make current setup permanent
+- **Settings → Export/Import Settings** for backup and sharing configurations
 - **Automatic saving** of window size, position, and preferences
 
 ### Refresh Settings
@@ -83,8 +95,8 @@ The Log Viewer includes a powerful filtering system with multiple modes:
 1. **Select mode** from the Mode dropdown
 2. **Enter text** in the Filter box
 3. **Toggle case sensitivity** with the Case checkbox
-4. **Results update automatically** as you type
-5. **Use filter history** with the ▼ button
+4. **Results update automatically** as you type (with debouncing)
+5. **Use filter history** with the ▼ button (last 20 filters)
 
 #### Regular Expression Examples
 - `^ERROR` - Lines starting with "ERROR"
@@ -97,7 +109,7 @@ The Log Viewer includes a powerful filtering system with multiple modes:
 - Filter history remembers your searches
 - Case sensitivity affects all modes
 - Invalid regex shows error indicator
-- Filter updates in real-time with 150ms debouncing
+- Filter updates in real-time with 300ms debouncing
 
 ### Encoding Detection
 The application automatically detects common encodings:
@@ -107,7 +119,7 @@ The application automatically detects common encodings:
 
 **Manual encoding override:**
 ```bash
-python FileUpdater.py --file log.txt --encoding utf-16
+python run.py --file log.txt --encoding utf-16
 ```
 
 ### File Rotation Handling
@@ -161,7 +173,7 @@ The Log Viewer includes three beautiful color themes:
 #### Filter Not Working
 - **Check case sensitivity** setting
 - **Verify filter text** is correct
-- **Wait for debouncing** (150ms delay)
+- **Wait for debouncing** (300ms delay)
 
 ### Error Messages
 
@@ -198,7 +210,7 @@ The Log Viewer includes three beautiful color themes:
 - **Escape:** Clear current filter
 
 ### Settings Management
-- **Settings → Preferences...** - Open configuration dialog
+- **Settings → Preferences...** - Open comprehensive configuration dialog
 - **Settings → Save Current Settings as Default** - Save current state
 - **Settings → Reset to Defaults** - Restore factory settings
 - **Settings → Export/Import Settings** - Backup and restore configurations
