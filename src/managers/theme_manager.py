@@ -82,6 +82,106 @@ class ThemeManager:
             "entry_bg": "#3d2b4d",     # Entry field background
             "entry_fg": "#f4e4bc",     # Entry field text color
             "entry_insert_bg": "#ff6b35", # Entry field cursor color
+        },
+        "ocean": {
+            "name": "Ocean",
+            "bg": "#0a1929",           # Main background (deep blue)
+            "fg": "#b8d4e3",           # Main text (light blue)
+            "text_bg": "#0a1929",      # Text area background
+            "text_fg": "#b8d4e3",      # Text area text color
+            "insert_bg": "#64b5f6",    # Text cursor/caret color (bright blue)
+            "toolbar_bg": "#1a2b3a",   # Toolbar background
+            "toolbar_fg": "#b8d4e3",   # Toolbar text color
+            "status_bg": "#1a2b3a",    # Status bar background
+            "status_fg": "#b8d4e3",    # Status bar text color
+            "menu_bg": "#1a2b3a",      # Menu background
+            "menu_fg": "#b8d4e3",      # Menu text color
+            "menu_select_bg": "#2a3b4a", # Menu selection highlight
+            "button_bg": "#2a3b4a",     # Button background
+            "button_fg": "#b8d4e3",    # Button text color
+            "entry_bg": "#1a2b3a",     # Entry field background
+            "entry_fg": "#b8d4e3",     # Entry field text color
+            "entry_insert_bg": "#64b5f6", # Entry field cursor color
+        },
+        "forest": {
+            "name": "Forest",
+            "bg": "#1a2f1a",           # Main background (dark green)
+            "fg": "#c8e6c9",           # Main text (light green)
+            "text_bg": "#1a2f1a",      # Text area background
+            "text_fg": "#c8e6c9",      # Text area text color
+            "insert_bg": "#4caf50",    # Text cursor/caret color (bright green)
+            "toolbar_bg": "#2a3f2a",   # Toolbar background
+            "toolbar_fg": "#c8e6c9",   # Toolbar text color
+            "status_bg": "#2a3f2a",    # Status bar background
+            "status_fg": "#c8e6c9",    # Status bar text color
+            "menu_bg": "#2a3f2a",      # Menu background
+            "menu_fg": "#c8e6c9",      # Menu text color
+            "menu_select_bg": "#3a4f3a", # Menu selection highlight
+            "button_bg": "#3a4f3a",     # Button background
+            "button_fg": "#c8e6c9",    # Button text color
+            "entry_bg": "#2a3f2a",     # Entry field background
+            "entry_fg": "#c8e6c9",     # Entry field text color
+            "entry_insert_bg": "#4caf50", # Entry field cursor color
+        },
+        "midnight": {
+            "name": "Midnight",
+            "bg": "#000000",           # Main background (pure black)
+            "fg": "#00ff00",           # Main text (matrix green)
+            "text_bg": "#000000",      # Text area background
+            "text_fg": "#00ff00",      # Text area text color
+            "insert_bg": "#ffffff",    # Text cursor/caret color (white)
+            "toolbar_bg": "#111111",   # Toolbar background
+            "toolbar_fg": "#00ff00",   # Toolbar text color
+            "status_bg": "#111111",    # Status bar background
+            "status_fg": "#00ff00",    # Status bar text color
+            "menu_bg": "#111111",      # Menu background
+            "menu_fg": "#00ff00",      # Menu text color
+            "menu_select_bg": "#222222", # Menu selection highlight
+            "button_bg": "#222222",     # Button background
+            "button_fg": "#00ff00",    # Button text color
+            "entry_bg": "#111111",     # Entry field background
+            "entry_fg": "#00ff00",     # Entry field text color
+            "entry_insert_bg": "#ffffff", # Entry field cursor color
+        },
+        "sepia": {
+            "name": "Sepia",
+            "bg": "#f4f1e8",           # Main background (warm cream)
+            "fg": "#5d4037",           # Main text (dark brown)
+            "text_bg": "#f4f1e8",      # Text area background
+            "text_fg": "#5d4037",      # Text area text color
+            "insert_bg": "#8d6e63",    # Text cursor/caret color (medium brown)
+            "toolbar_bg": "#e8e0d0",   # Toolbar background
+            "toolbar_fg": "#5d4037",   # Toolbar text color
+            "status_bg": "#e8e0d0",    # Status bar background
+            "status_fg": "#5d4037",    # Status bar text color
+            "menu_bg": "#e8e0d0",      # Menu background
+            "menu_fg": "#5d4037",      # Menu text color
+            "menu_select_bg": "#d7ccc8", # Menu selection highlight
+            "button_bg": "#d7ccc8",     # Button background
+            "button_fg": "#5d4037",    # Button text color
+            "entry_bg": "#f4f1e8",     # Entry field background
+            "entry_fg": "#5d4037",     # Entry field text color
+            "entry_insert_bg": "#8d6e63", # Entry field cursor color
+        },
+        "high_contrast": {
+            "name": "High Contrast",
+            "bg": "#ffffff",           # Main background (pure white)
+            "fg": "#000000",           # Main text (pure black)
+            "text_bg": "#ffffff",      # Text area background
+            "text_fg": "#000000",      # Text area text color
+            "insert_bg": "#000000",    # Text cursor/caret color (black)
+            "toolbar_bg": "#ffffff",   # Toolbar background
+            "toolbar_fg": "#000000",   # Toolbar text color
+            "status_bg": "#ffffff",    # Status bar background
+            "status_fg": "#000000",    # Status bar text color
+            "menu_bg": "#ffffff",      # Menu background
+            "menu_fg": "#000000",      # Menu text color
+            "menu_select_bg": "#000000", # Menu selection highlight (black)
+            "button_bg": "#ffffff",     # Button background
+            "button_fg": "#000000",    # Button text color
+            "entry_bg": "#ffffff",     # Entry field background
+            "entry_fg": "#000000",     # Entry field text color
+            "entry_insert_bg": "#000000", # Entry field cursor color (black)
         }
     }
     

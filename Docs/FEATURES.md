@@ -108,7 +108,7 @@ Comprehensive documentation of all current features and planned improvements for
 - **`--file` / `-f`**: Specify log file to open
 - **`--refresh` / `-r`**: Set refresh interval in milliseconds
 - **`--encoding` / `-e`**: Override automatic encoding detection
-- **`--theme` / `-t`**: Set initial theme (dark/light/sunset)
+- **`--theme` / `-t`**: Set initial theme (dark/light/sunset/ocean/forest/midnight/sepia/high_contrast)
 
 #### Runtime Controls
 - **Dynamic refresh rate** adjustment via UI
@@ -130,6 +130,11 @@ Comprehensive documentation of all current features and planned improvements for
 - **Dark Theme**: Professional dark interface with high contrast
 - **Light Theme**: Clean light interface for bright environments
 - **Sunset Theme**: Warm purple/orange theme for extended use
+- **Ocean Theme**: Deep blue interface with light blue text
+- **Forest Theme**: Dark green interface with light green text
+- **Midnight Theme**: Pure black with matrix green text
+- **Sepia Theme**: Warm cream background with brown text
+- **High Contrast**: Maximum contrast white/black interface
 
 #### Theme Features
 - **Live preview** with color samples

@@ -57,6 +57,11 @@ Complete guide to using the Log Viewer application for monitoring log files in r
 - **Dark theme** (default) - Easy on the eyes for long viewing sessions
 - **Light theme** - Classic light background for bright environments
 - **Sunset theme** - Warm purple and cream colors for a unique look
+- **Ocean theme** - Deep blue interface with light blue text
+- **Forest theme** - Dark green interface with light green text
+- **Midnight theme** - Pure black with matrix green text
+- **Sepia theme** - Warm cream background with brown text
+- **High Contrast theme** - Maximum contrast white/black interface
 - **Theme persistence** - Your choice is remembered between sessions
 - **Quick switching** - Use Ctrl+T to cycle through themes
 
@@ -128,7 +133,7 @@ python run.py --file log.txt --encoding utf-16
 - **No manual intervention** required
 
 ### Theme System
-The Log Viewer includes three beautiful color themes:
+The Log Viewer includes eight beautiful color themes:
 
 #### Dark Theme (Default)
 - **Background:** Deep gray (#1e1e1e)
@@ -144,6 +149,31 @@ The Log Viewer includes three beautiful color themes:
 - **Background:** Deep purple (#2d1b3d)
 - **Text:** Warm cream (#f4e4bc)
 - **Best for:** Unique aesthetic, reduced eye strain
+
+#### Ocean Theme
+- **Background:** Deep blue (#0a1929)
+- **Text:** Light blue (#b8d4e3)
+- **Best for:** Calming blue tones, professional environments
+
+#### Forest Theme
+- **Background:** Dark green (#1a2f1a)
+- **Text:** Light green (#c8e6c9)
+- **Best for:** Nature-inspired interface, easy on the eyes
+
+#### Midnight Theme
+- **Background:** Pure black (#000000)
+- **Text:** Matrix green (#00ff00)
+- **Best for:** Classic terminal look, maximum contrast
+
+#### Sepia Theme
+- **Background:** Warm cream (#f4f1e8)
+- **Text:** Dark brown (#5d4037)
+- **Best for:** Vintage aesthetic, reduced blue light
+
+#### High Contrast Theme
+- **Background:** Pure white (#ffffff)
+- **Text:** Pure black (#000000)
+- **Best for:** Accessibility, maximum readability
 
 **Theme Features:**
 - **Live preview** with the 🎨 button in the toolbar

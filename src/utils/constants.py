@@ -37,7 +37,12 @@ FILTER_DEBOUNCE_MS = 150
 THEME_NAMES = {
     "dark": "Dark",
     "light": "Light", 
-    "sunset": "Sunset"
+    "sunset": "Sunset",
+    "ocean": "Ocean",
+    "forest": "Forest",
+    "midnight": "Midnight",
+    "sepia": "Sepia",
+    "high_contrast": "High Contrast"
 }
 
 # Configuration file paths

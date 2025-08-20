@@ -53,7 +53,7 @@ def main():
     parser.add_argument('--encoding', '-e', default=DEFAULT_ENCODING, 
                        help='File encoding (default auto; try utf-16 on Windows logs)')
     parser.add_argument('--theme', '-t', default=DEFAULT_THEME, 
-                       choices=['dark', 'light', 'sunset'], 
+                       choices=['dark', 'light', 'sunset', 'ocean', 'forest', 'midnight', 'sepia', 'high_contrast'], 
                        help='Color theme (default dark)')
     args = parser.parse_args()
 

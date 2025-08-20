@@ -32,6 +32,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - None currently
 
+## [2.1.0] - 2024-01-XX - Theme Expansion Release
+
+### Added
+- **Expanded theme system** with 8 beautiful color themes:
+  - **Ocean Theme**: Deep blue interface with light blue text
+  - **Forest Theme**: Dark green interface with light green text  
+  - **Midnight Theme**: Pure black with matrix green text
+  - **Sepia Theme**: Warm cream background with brown text
+  - **High Contrast Theme**: Maximum contrast white/black interface
+- **Enhanced theme selection** in command line arguments
+- **Improved theme documentation** with detailed descriptions
+
 ## [2.0.0] - 2024-01-XX - Major Restructuring Release
 
 ### Added
