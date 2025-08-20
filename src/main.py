@@ -15,7 +15,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.managers import ThemeManager, FilterManager, ConfigManager, FileManager
 from src.ui.main_window import LogViewerApp
-from src.utils.constants import DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME
+from src.utils.constants import (
+    APP_NAME, APP_VERSION, APP_DESCRIPTION,
+    DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME
+)
 
 
 def main():
@@ -25,7 +28,11 @@ def main():
     Parses command line arguments and launches the main application
     with specified configuration options.
     """
-    parser = argparse.ArgumentParser(description="Simple GUI log viewer that tails a file.")
+    parser = argparse.ArgumentParser(
+        prog=APP_NAME,
+        description=f"{APP_DESCRIPTION} ({APP_VERSION})"
+    )
+    parser.add_argument('--version', action='version', version=f'{APP_NAME} {APP_VERSION}')
     parser.add_argument('--file', '-f', help='Path to the log file to open on launch')
     parser.add_argument('--refresh', '-r', type=int, default=DEFAULT_REFRESH_MS, 
                        help='Refresh interval in milliseconds (default 500)')

@@ -17,6 +17,7 @@ from typing import Optional
 
 from ..managers import ThemeManager, FilterManager, ConfigManager, FileManager
 from ..utils.constants import (
+    APP_NAME, APP_VERSION, APP_DESCRIPTION, APP_AUTHOR,
     MAX_LINES_DEFAULT, DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME,
     FILTER_DEBOUNCE_MS, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT
 )
@@ -48,7 +49,7 @@ class LogViewerApp(tk.Tk):
         # Initialize configuration manager first (needed for window setup)
         self.config_manager = ConfigManager()
         
-        self.title("Log Viewer")
+        self.title(f"{APP_NAME} {APP_VERSION}")
         
         # Get saved window geometry and apply it
         saved_geometry = self.config_manager.get_window_geometry()
@@ -191,6 +192,8 @@ class LogViewerApp(tk.Tk):
         help_menu.add_command(label="Filter Help", command=self._show_filter_help)
         help_menu.add_command(label="Theme Info", command=self._show_theme_info)
         help_menu.add_command(label="Keyboard Shortcuts", command=self._show_keyboard_shortcuts)
+        help_menu.add_separator()
+        help_menu.add_command(label="About", command=self._show_about)
         menubar.add_cascade(label="Help", menu=help_menu)
         self.config(menu=menubar)
         
@@ -1151,4 +1154,48 @@ class LogViewerApp(tk.Tk):
     
     def _show_keyboard_shortcuts(self):
         """Show available keyboard shortcuts."""
-        messagebox.showinfo("Keyboard Shortcuts", "Keyboard shortcuts help will be implemented in the next phase.")
+        shortcuts = """Keyboard Shortcuts:
+
+File Operations:
+• Ctrl+O - Open file
+• Ctrl+Q - Quit application
+
+View Controls:
+• Ctrl+W - Toggle word wrap
+• Ctrl+P - Pause/Resume monitoring
+• Ctrl+L - Toggle line numbers
+
+Filtering:
+• Ctrl+F - Focus filter box
+• Ctrl+R - Focus filter box (alternative)
+• Escape - Clear current filter
+
+Themes:
+• Ctrl+T - Cycle through themes
+
+Navigation:
+• Mouse wheel - Scroll text
+• Page Up/Down - Navigate content
+• Home/End - Go to start/end"""
+        
+        messagebox.showinfo("Keyboard Shortcuts", shortcuts)
+    
+    def _show_about(self):
+        """Show application information and version."""
+        about_text = f"""{APP_NAME} {APP_VERSION}
+
+{APP_DESCRIPTION}
+
+Author: {APP_AUTHOR}
+
+Features:
+• Real-time log file monitoring
+• Advanced filtering with 6 modes
+• Multiple color themes
+• Cross-platform compatibility
+• No external dependencies
+
+Built with Python and Tkinter
+© 2024 Log Viewer Team"""
+        
+        messagebox.showinfo("About", about_text)

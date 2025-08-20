@@ -6,6 +6,12 @@ This module contains all global constants used throughout the application
 including default values, configuration keys, and application settings.
 """
 
+# Application metadata
+APP_NAME = "Log Viewer"
+APP_VERSION = "v0.1"
+APP_DESCRIPTION = "Real-time log file monitor with advanced filtering"
+APP_AUTHOR = "Log Viewer Team"
+
 # Application defaults
 MAX_LINES_DEFAULT = 10_000      # Maximum lines to keep in memory
 DEFAULT_REFRESH_MS = 500        # Default refresh interval in milliseconds
