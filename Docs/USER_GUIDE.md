@@ -115,6 +115,8 @@ The Log Viewer includes a powerful filtering system with multiple modes:
 - Case sensitivity affects all modes
 - Invalid regex shows error indicator
 - Filter updates in real-time with 300ms debouncing
+- **Text highlighting** shows exactly what matched your filter
+- Multiple highlight colors help distinguish different matches
 
 ### Encoding Detection
 The application automatically detects common encodings:
@@ -131,6 +133,31 @@ python run.py --file log.txt --encoding utf-16
 - **Automatic detection** of file rotation/truncation
 - **Seamless reopening** when files are rotated
 - **No manual intervention** required
+
+### Text Highlighting
+The Log Viewer automatically highlights text that matches your current filter, making it easy to see exactly what matched:
+
+#### Highlight Colors
+- **Yellow** (#ffeb3b) - Primary highlight color
+- **Green** (#4caf50) - Secondary highlight color  
+- **Blue** (#2196f3) - Tertiary highlight color
+- **Orange** (#ff9800) - Quaternary highlight color
+- **Purple** (#9c27b0) - Quinary highlight color
+
+#### Highlight Behavior by Filter Mode
+- **Contains**: Highlights all occurrences of the filter text
+- **Starts With**: Highlights the beginning of matching lines
+- **Ends With**: Highlights the end of matching lines
+- **Exact Match**: Highlights the entire matching line
+- **Regex**: Highlights all regex pattern matches
+- **Not Contains**: No highlighting (shows non-matching lines)
+
+#### Highlight Features
+- **Multiple colors** cycle through for multiple matches in the same line
+- **Real-time updates** as you type or change filter settings
+- **Automatic clearing** when filters are cleared or changed
+- **Case-sensitive highlighting** respects your case sensitivity setting
+- **Performance optimized** with minimal impact on display speed
 
 ### Theme System
 The Log Viewer includes eight beautiful color themes:

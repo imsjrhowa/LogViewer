@@ -211,6 +211,33 @@ def _on_filter_change(self):
     self._filter_job = self.after(300, self._rebuild_view)
 ```
 
+### Text Highlighting System
+```python
+# Highlight configuration with 5 color schemes
+def _configure_highlight_tags(self):
+    highlight_colors = [
+        ('filter_highlight_1', '#ffeb3b', '#000000'),  # Yellow
+        ('filter_highlight_2', '#4caf50', '#ffffff'),  # Green
+        ('filter_highlight_3', '#2196f3', '#ffffff'),  # Blue
+        ('filter_highlight_4', '#ff9800', '#000000'),  # Orange
+        ('filter_highlight_5', '#9c27b0', '#ffffff'),  # Purple
+    ]
+    
+    for tag_name, bg_color, fg_color in highlight_colors:
+        self.text.tag_configure(tag_name, 
+                               background=bg_color, 
+                               foreground=fg_color)
+
+# Mode-specific highlighting
+def _highlight_filter_matches(self, start_pos, end_pos, line_content):
+    filter_mode = self.filter_manager.current_mode
+    if filter_mode == "contains":
+        self._highlight_contains_matches(start_pos, end_pos, line_content, filter_text, case_sensitive)
+    elif filter_mode == "regex":
+        self._highlight_regex_matches(start_pos, end_pos, line_content, filter_text, case_sensitive)
+    # ... other modes
+```
+
 ### Polling Engine
 ```python
 def _poll(self):

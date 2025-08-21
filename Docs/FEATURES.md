@@ -45,6 +45,7 @@ Comprehensive documentation of all current features and planned improvements for
 - **Debounced input** (300ms delay) for performance
 - **Visual status indicators** showing filter state and errors
 - **Filter preferences persistence** across sessions
+- **Text highlighting** for filter matches with multiple color schemes
 
 #### Text Display
 - **Monospaced font** (Consolas on Windows, Menlo on macOS)

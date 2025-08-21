@@ -117,8 +117,7 @@ class LogViewerApp(tk.Tk):
         # Set application icon based on current theme
         self._set_app_icon()
         
-        # Load saved filter preferences
-        self._load_filter_preferences()
+        # Filter preferences are not loaded on startup - filter field starts empty
         
         # Apply initial theme to all UI elements
         self._apply_theme()
@@ -136,6 +135,8 @@ class LogViewerApp(tk.Tk):
             
         # Start the polling loop for file updates
         self.after(self.refresh_ms.get(), self._poll)
+        
+
         
         # Bind window close event to save configuration
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
@@ -425,31 +426,7 @@ class LogViewerApp(tk.Tk):
             # Silently fail if icon setting fails
             pass
     
-    def _load_filter_preferences(self):
-        """
-        Load saved filter preferences.
-        
-        Restores previously saved filter settings including mode,
-        case sensitivity, and filter text.
-        
-        Returns:
-            Default values if no preferences are saved
-        """
-        try:
-            config_file = os.path.join(os.path.expanduser("~/.logviewer"), "filter_prefs.txt")
-            if os.path.exists(config_file):
-                with open(config_file, 'r') as f:
-                    for line in f:
-                        if ':' in line:
-                            key, value = line.strip().split(':', 1)
-                            if key == 'mode' and value in self.filter_manager.get_mode_names():
-                                self.filter_mode.set(value)
-                            elif key == 'case_sensitive':
-                                self.case_sensitive.set(value.lower() == 'true')
-                            elif key == 'filter_text':
-                                self.filter_text.set(value)
-        except Exception:
-            pass
+
     
     def _apply_theme(self):
         """
@@ -515,11 +492,12 @@ class LogViewerApp(tk.Tk):
         # Update application icon to match theme
         self._set_app_icon()
         
+        # Reconfigure highlight tags for new theme
+        if hasattr(self, '_highlight_tag_configured'):
+            self._configure_highlight_tags()
+        
         # Save theme preference
         self._save_theme_preference()
-        
-        # Save filter preferences
-        self._save_filter_preferences()
     
     def _open_path(self, path, first_open=False):
         """
@@ -665,13 +643,18 @@ class LogViewerApp(tk.Tk):
         mode_index = self.filter_mode_combo.current()
         mode_name = self.filter_manager.get_mode_names()[mode_index]
         
+        filter_text = self.filter_text.get()
+        
         if self.filter_manager.set_filter(
-            self.filter_text.get(), 
+            filter_text, 
             mode_name, 
             self.case_sensitive.get()
         ):
             # Update filter status indicator
             self._update_filter_status()
+            
+            # Clear old highlighting when filter changes
+            self._clear_highlighting()
             
             # Debounce rapid typing; rebuild shortly after user stops
             if self._filter_job is not None:
@@ -680,6 +663,13 @@ class LogViewerApp(tk.Tk):
                 except Exception:
                     pass
             self._filter_job = self.after(FILTER_DEBOUNCE_MS, self._rebuild_view)
+            
+            # If there's no filter text, clear highlighting immediately
+            if not filter_text:
+                self._clear_highlighting()
+            else:
+                # For immediate feedback, apply highlighting to current content
+                self.after(50, self._refresh_highlighting)
     
     def _update_filter_status(self):
         """
@@ -718,6 +708,10 @@ class LogViewerApp(tk.Tk):
         self.filter_text.set("")
         self.filter_manager.clear_filter()
         self._filtered_lines = []  # Clear filtered lines when filter is cleared
+        
+        # Clear all highlighting tags
+        self._clear_highlighting()
+        
         self._rebuild_view()
         self._set_status("Filter cleared")
     
@@ -730,6 +724,7 @@ class LogViewerApp(tk.Tk):
         accurate reference.
         """
         try:
+            
             # Clear current display
             self.text.delete('1.0', tk.END)
             at_end = True
@@ -739,12 +734,28 @@ class LogViewerApp(tk.Tk):
             # Store filtered lines with their original line numbers
             self._filtered_lines = []
             
-            # Apply filter to all stored lines
+            # First, collect all matching lines
+            matching_lines = []
             for i, line in enumerate(self._line_buffer, 1):
                 if self.filter_manager.matches(line):
-                    self.text.insert(tk.END, line)
-                    self._filtered_lines.append((i, line))  # Store (original_line_number, line_content)
+                    matching_lines.append((i, line))
                     matched_count += 1
+            
+            # Then insert all matching lines at once
+            for i, line in matching_lines:
+                self.text.insert(tk.END, line)
+                self._filtered_lines.append((i, line))
+            
+            # Now apply highlighting to the complete filtered content
+            if self.filter_manager.current_filter and matching_lines:
+                self._highlight_all_filter_matches()
+                
+            # Force update to ensure highlighting is applied
+            self.text.update_idletasks()
+            
+            # Ensure highlighting is applied even if the above didn't work
+            if self.filter_manager.current_filter:
+                self.after(100, self._refresh_highlighting)
             
             # Auto-scroll if configured and we were at the end
             if self.autoscroll.get() and at_end:
@@ -764,6 +775,362 @@ class LogViewerApp(tk.Tk):
                 
         except Exception as e:
             self._set_status("Filter error: {}".format(e))
+    
+    def _highlight_filter_matches(self, start_pos, end_pos, line_content):
+        """
+        Highlight text that matches the current filter in the specified range.
+        
+        Args:
+            start_pos: Starting position in the text widget
+            end_pos: Ending position in the text widget
+            line_content: The content of the line to highlight
+        """
+        try:
+            if not self.filter_manager.current_filter:
+                return
+                
+            filter_text = self.filter_manager.current_filter
+            filter_mode = self.filter_manager.current_mode
+            case_sensitive = self.filter_manager.case_sensitive
+            
+            # Configure highlight tag if not already configured
+            if not hasattr(self, '_highlight_tag_configured'):
+                self._configure_highlight_tags()
+                self._highlight_tag_configured = True
+            
+            # Find and highlight matches based on filter mode
+            if filter_mode == "contains":
+                self._highlight_contains_matches(start_pos, end_pos, line_content, filter_text, case_sensitive)
+            elif filter_mode == "starts_with":
+                self._highlight_starts_with_matches(start_pos, end_pos, line_content, filter_text, case_sensitive)
+            elif filter_mode == "ends_with":
+                self._highlight_ends_with_matches(start_pos, end_pos, line_content, filter_text, case_sensitive)
+            elif filter_mode == "exact":
+                self._highlight_exact_matches(start_pos, end_pos, line_content, filter_text, case_sensitive)
+            elif filter_mode == "regex":
+                self._highlight_regex_matches(start_pos, end_pos, line_content, filter_text, case_sensitive)
+            # Note: "not_contains" mode doesn't need highlighting since it shows non-matching lines
+            
+        except Exception:
+            # Silently fail highlighting to avoid breaking the main functionality
+            pass
+    
+    def _highlight_all_filter_matches(self):
+        """
+        Highlight all filter matches in the currently displayed filtered content.
+        This method is called after all filtered lines have been inserted.
+        """
+        try:
+            if not self.filter_manager.current_filter:
+                return
+                
+            filter_text = self.filter_manager.current_filter
+            filter_mode = self.filter_manager.current_mode
+            case_sensitive = self.filter_manager.case_sensitive
+            
+            # Configure highlight tag if not already configured
+            if not hasattr(self, '_highlight_tag_configured'):
+                self._configure_highlight_tags()
+                self._highlight_tag_configured = True
+            
+            # Get the complete text content that's currently displayed
+            displayed_text = self.text.get('1.0', 'end-1c')
+            if not displayed_text:
+                return
+            
+            # Find and highlight matches based on filter mode
+            if filter_mode == "contains":
+                self._highlight_contains_matches_in_text(displayed_text, filter_text, case_sensitive)
+            elif filter_mode == "starts_with":
+                self._highlight_starts_with_matches_in_text(displayed_text, filter_text, case_sensitive)
+            elif filter_mode == "ends_with":
+                self._highlight_ends_with_matches_in_text(displayed_text, filter_text, case_sensitive)
+            elif filter_mode == "exact":
+                self._highlight_exact_matches_in_text(displayed_text, filter_text, case_sensitive)
+            elif filter_mode == "regex":
+                self._highlight_regex_matches_in_text(displayed_text, filter_text, case_sensitive)
+            # Note: "not_contains" mode doesn't need highlighting since it shows non-matching lines
+            
+        except Exception:
+            # Silently fail highlighting to avoid breaking the main functionality
+            pass
+    
+    def _configure_highlight_tags(self):
+        """Configure text highlighting tags with theme-appropriate colors."""
+        # Remove existing tags to avoid conflicts
+        for tag in self.text.tag_names():
+            if tag.startswith('filter_highlight'):
+                self.text.tag_delete(tag)
+        
+        # Get current theme's highlight colors
+        theme = self.theme_manager.get_current_theme()
+        highlight_bg = theme.get('highlight_bg', '#ffeb3b')  # Fallback to yellow
+        highlight_fg = theme.get('highlight_fg', '#000000')  # Fallback to black
+        
+        # Create single highlight tag with theme colors
+        self.text.tag_configure('filter_highlight', 
+                               background=highlight_bg, 
+                               foreground=highlight_fg,
+                               relief='raised',
+                               borderwidth=1)
+        # Raise the tag priority to ensure it's visible over other tags
+        self.text.tag_raise('filter_highlight')
+
+
+    
+    def _highlight_contains_matches_in_text(self, displayed_text, filter_text, case_sensitive):
+        """Highlight all occurrences of the filter text in the displayed text."""
+        if not filter_text:
+            return
+        
+        # Use the text widget's search to find all occurrences
+        search_start = "1.0"
+        tag_index = 0
+        
+        while True:
+            # Search for the filter text in the entire text widget
+            found_pos = self.text.search(filter_text, search_start, "end", nocase=not case_sensitive)
+            if not found_pos:
+                break
+                
+            # Calculate end position
+            found_end = self.text.index(f"{found_pos}+{len(filter_text)}c")
+            
+            # Apply highlighting tag
+            self.text.tag_add('filter_highlight', found_pos, found_end)
+            
+            # Move to next position to avoid infinite loop
+            search_start = self.text.index(f"{found_pos}+1c")
+            tag_index += 1
+            
+            # Safety break to avoid infinite loops
+            if tag_index > 100:
+                break
+    
+    def _highlight_starts_with_matches_in_text(self, displayed_text, filter_text, case_sensitive):
+        """Highlight lines that start with the filter text."""
+        if not filter_text:
+            return
+        
+        # Split displayed text into lines and find matches
+        lines = displayed_text.splitlines()
+        tag_index = 0
+        
+        for i, line in enumerate(lines):
+            if case_sensitive:
+                if line.startswith(filter_text):
+                    line_start = f"{i+1}.0"
+                    line_end = f"{i+1}.{len(filter_text)}"
+                    tag_name = f'filter_highlight_{(tag_index % 5) + 1}'
+                    self.text.tag_add(tag_name, line_start, line_end)
+                    tag_index += 1
+            else:
+                if line.lower().startswith(filter_text.lower()):
+                    line_start = f"{i+1}.0"
+                    line_end = f"{i+1}.{len(filter_text)}"
+                    tag_name = f'filter_highlight_{(tag_index % 5) + 1}'
+                    self.text.tag_add(tag_name, line_start, line_end)
+                    tag_index += 1
+    
+    def _highlight_ends_with_matches_in_text(self, displayed_text, filter_text, case_sensitive):
+        """Highlight lines that end with the filter text."""
+        if not filter_text:
+            return
+        
+        # Split displayed text into lines and find matches
+        lines = displayed_text.splitlines()
+        tag_index = 0
+        
+        for i, line in enumerate(lines):
+            if case_sensitive:
+                if line.endswith(filter_text):
+                    line_start = f"{i+1}.{len(line) - len(filter_text)}"
+                    line_end = f"{i+1}.end"
+                    tag_name = f'filter_highlight_{(tag_index % 5) + 1}'
+                    self.text.tag_add(tag_name, line_start, line_end)
+                    tag_index += 1
+            else:
+                if line.lower().endswith(filter_text.lower()):
+                    line_start = f"{i+1}.{len(line) - len(filter_text)}"
+                    line_end = f"{i+1}.end"
+                    tag_name = f'filter_highlight_{(tag_index % 5) + 1}'
+                    self.text.tag_add(tag_name, line_start, line_end)
+                    tag_index += 1
+    
+    def _highlight_exact_matches_in_text(self, displayed_text, filter_text, case_sensitive):
+        """Highlight lines that exactly match the filter text."""
+        if not filter_text:
+            return
+        
+        # Split displayed text into lines and find matches
+        lines = displayed_text.splitlines()
+        tag_index = 0
+        
+        for i, line in enumerate(lines):
+            if case_sensitive:
+                if line.rstrip() == filter_text:
+                    line_start = f"{i+1}.0"
+                    line_end = f"{i+1}.end"
+                    tag_name = f'filter_highlight_{(tag_index % 5) + 1}'
+                    self.text.tag_add(tag_name, line_start, line_end)
+                    tag_index += 1
+            else:
+                if line.rstrip().lower() == filter_text.lower():
+                    line_start = f"{i+1}.0"
+                    line_end = f"{i+1}.end"
+                    tag_name = f'filter_highlight_{(tag_index % 5) + 1}'
+                    self.text.tag_add(tag_name, line_start, line_end)
+                    tag_index += 1
+    
+    def _highlight_regex_matches_in_text(self, displayed_text, filter_text, case_sensitive):
+        """Highlight regex pattern matches in the displayed text."""
+        if not filter_text:
+            return
+        
+        try:
+            import re
+            flags = 0 if case_sensitive else re.IGNORECASE
+            
+            # Split displayed text into lines and find matches
+            lines = displayed_text.splitlines()
+            tag_index = 0
+            
+            for i, line in enumerate(lines):
+                pattern = re.compile(filter_text, flags)
+                matches = list(pattern.finditer(line))
+                
+                for match in matches:
+                    line_start = f"{i+1}.{match.start()}"
+                    line_end = f"{i+1}.{match.end()}"
+                    tag_name = f'filter_highlight_{(tag_index % 5) + 1}'
+                    self.text.tag_add(tag_name, line_start, line_end)
+                    tag_index += 1
+                    
+        except Exception:
+            # If regex compilation fails, fall back to contains highlighting
+            self._highlight_contains_matches_in_text(displayed_text, filter_text, case_sensitive)
+    
+    def _highlight_contains_matches(self, start_pos, end_pos, line_content, filter_text, case_sensitive):
+        """Highlight all occurrences of the filter text in the line."""
+        if not filter_text:
+            return
+        
+        # Use the text widget's search to find all occurrences
+        search_start = "1.0"
+        tag_index = 0
+        
+        while True:
+            # Search for the filter text in the entire text widget
+            found_pos = self.text.search(filter_text, search_start, "end", nocase=not case_sensitive)
+            if not found_pos:
+                break
+                
+            # Calculate end position
+            found_end = self.text.index(f"{found_pos}+{len(filter_text)}c")
+            
+            # Apply highlighting tag
+            tag_name = f'filter_highlight_{(tag_index % 5) + 1}'
+            self.text.tag_add(tag_name, found_pos, found_end)
+            
+            # Move to next position to avoid infinite loop
+            search_start = self.text.index(f"{found_end}+1c")
+            tag_index += 1
+            
+            # Safety break to avoid infinite loops
+            if tag_index > 100:
+                break
+    
+    def _highlight_starts_with_matches(self, start_pos, end_pos, line_content, filter_text, case_sensitive):
+        """Highlight the beginning of the line if it starts with the filter text."""
+        if not filter_text:
+            return
+            
+        if case_sensitive:
+            if line_content.startswith(filter_text):
+                line_start = start_pos
+                line_end = self.text.index(f"{start_pos}+{len(filter_text)}c")
+                self.text.tag_add('filter_highlight', line_start, line_end)
+        else:
+            if line_content.lower().startswith(filter_text.lower()):
+                line_start = start_pos
+                line_end = self.text.index(f"{start_pos}+{len(filter_text)}c")
+                self.text.tag_add('filter_highlight', line_start, line_end)
+    
+    def _highlight_ends_with_matches(self, start_pos, end_pos, line_content, filter_text, case_sensitive):
+        """Highlight the end of the line if it ends with the filter text."""
+        if not filter_text:
+            return
+            
+        if case_sensitive:
+            if line_content.endswith(filter_text):
+                line_start = self.text.index(f"{end_pos}-{len(filter_text)}c")
+                line_end = end_pos
+                self.text.tag_add('filter_highlight', line_start, line_end)
+        else:
+            if line_content.lower().endswith(filter_text.lower()):
+                line_start = self.text.index(f"{end_pos}-{len(filter_text)}c")
+                line_end = end_pos
+                self.text.tag_add('filter_highlight', line_start, line_end)
+    
+    def _highlight_exact_matches(self, start_pos, end_pos, line_content, filter_text, case_sensitive):
+        """Highlight the entire line if it exactly matches the filter text."""
+        if not filter_text:
+            return
+            
+        if case_sensitive:
+            if line_content.rstrip() == filter_text:
+                self.text.tag_add('filter_highlight', start_pos, end_pos)
+        else:
+            if line_content.rstrip().lower() == filter_text.lower():
+                self.text.tag_add('filter_highlight', start_pos, end_pos)
+    
+    def _highlight_regex_matches(self, start_pos, end_pos, line_content, filter_text, case_sensitive):
+        """Highlight regex pattern matches in the line."""
+        if not filter_text:
+            return
+            
+        try:
+            import re
+            flags = 0 if case_sensitive else re.IGNORECASE
+            
+            # Find all matches of the regex pattern
+            pattern = re.compile(filter_text, flags)
+            matches = list(pattern.finditer(line_content))
+            
+            tag_index = 0
+            for match in matches:
+                # Calculate positions in the text widget
+                line_start = self.text.index(f"{start_pos}+{match.start()}c")
+                line_end = self.text.index(f"{line_start}+{match.end() - match.start()}c")
+                
+                # Apply highlighting tag
+                self.text.tag_add('filter_highlight', line_start, line_end)
+                tag_index += 1
+                
+        except Exception:
+            # If regex compilation fails, fall back to contains highlighting
+            self._highlight_contains_matches(start_pos, end_pos, line_content, filter_text, case_sensitive)
+    
+    def _clear_highlighting(self):
+        """Clear all highlighting tags from the text widget."""
+        try:
+            # Remove the single highlight tag from all ranges but keep the configuration
+            self.text.tag_remove('filter_highlight', '1.0', 'end')
+        except Exception:
+            pass  # Silently fail to avoid breaking functionality
+    
+    def _refresh_highlighting(self):
+        """Refresh highlighting for the current filter on the displayed content."""
+        try:
+            if self.filter_manager.current_filter:
+                # Clear existing highlighting first
+                self._clear_highlighting()
+                # Reapply highlighting to current content
+                self._highlight_all_filter_matches()
+                # Force update to ensure highlighting is visible
+                self.text.update_idletasks()
+        except Exception:
+            pass  # Silently fail to avoid breaking functionality
     
     def _show_filter_info(self):
         """Show detailed information about the current filter."""
@@ -823,6 +1190,10 @@ class LogViewerApp(tk.Tk):
         Removes all content from the text widget and updates line numbers.
         """
         self.text.delete('1.0', tk.END)
+        
+        # Clear all highlighting tags
+        self._clear_highlighting()
+        
         self._update_line_numbers()
     
     def _toggle_wrap(self):
@@ -1063,9 +1434,20 @@ class LogViewerApp(tk.Tk):
         self._buffer_trim()
         
         # Apply current filter to new lines
+        matching_lines = []
         for line in lines:
             if self.filter_manager.matches(line):
-                self.text.insert(tk.END, line)
+                matching_lines.append(line)
+        
+        # Insert all matching lines at once
+        for line in matching_lines:
+            self.text.insert(tk.END, line)
+        
+        # Apply highlighting to all newly added content if there's an active filter
+        if self.filter_manager.current_filter and matching_lines:
+            self._highlight_all_filter_matches()
+            # Force update to ensure highlighting is applied
+            self.text.update_idletasks()
         
         self._trim_if_needed()
         if self.autoscroll.get() and (at_end or self.paused.get() is False):
@@ -1116,24 +1498,7 @@ class LogViewerApp(tk.Tk):
         except Exception:
             pass  # Silently fail if we can't save preferences
     
-    def _save_filter_preferences(self):
-        """
-        Save current filter preferences to config file.
-        
-        Stores filter mode, case sensitivity, and other filter-related
-        settings for restoration on next launch.
-        """
-        try:
-            config_dir = os.path.expanduser("~/.logviewer")
-            os.makedirs(config_dir, exist_ok=True)
-            config_file = os.path.join(config_dir, "filter_prefs.txt")
-            
-            with open(config_file, 'w') as f:
-                f.write(f"mode:{self.filter_mode.get()}\n")
-                f.write(f"case_sensitive:{self.case_sensitive.get()}\n")
-                f.write(f"filter_text:{self.filter_text.get()}\n")
-        except Exception:
-            pass  # Silently fail if we can't save preferences
+
     
     def _show_settings(self):
         """Show the settings/preferences dialog."""

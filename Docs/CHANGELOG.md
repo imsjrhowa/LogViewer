@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **High Contrast Theme**: Maximum contrast white/black interface
 - **Enhanced theme selection** in command line arguments
 - **Improved theme documentation** with detailed descriptions
+- **Text highlighting system** for filter matches:
+  - **5 highlight colors** that cycle through for multiple matches
+  - **Mode-specific highlighting** (contains, starts with, ends with, exact match, regex)
+  - **Real-time highlighting** as you type or change filters
+  - **Performance optimized** highlighting with minimal impact
 
 ## [2.0.0] - 2024-01-XX - Major Restructuring Release
 

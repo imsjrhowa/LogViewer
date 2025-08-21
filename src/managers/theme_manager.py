@@ -42,6 +42,8 @@ class ThemeManager:
             "entry_bg": "#3c3c3c",     # Entry field background
             "entry_fg": "#d4d4d4",     # Entry field text color
             "entry_insert_bg": "#ffffff", # Entry field cursor color
+            "highlight_bg": "#ff6b35",  # Highlight background (bright orange)
+            "highlight_fg": "#000000",  # Highlight text color (black)
         },
         "light": {
             "name": "Light",
@@ -62,6 +64,8 @@ class ThemeManager:
             "entry_bg": "#ffffff",     # Entry field background
             "entry_fg": "#000000",     # Entry field text color
             "entry_insert_bg": "#000000", # Entry field cursor color
+            "highlight_bg": "#2196f3",  # Highlight background (bright blue)
+            "highlight_fg": "#ffffff",  # Highlight text color (white)
         },
         "sunset": {
             "name": "Sunset",
@@ -82,6 +86,8 @@ class ThemeManager:
             "entry_bg": "#3d2b4d",     # Entry field background
             "entry_fg": "#f4e4bc",     # Entry field text color
             "entry_insert_bg": "#ff6b35", # Entry field cursor color
+            "highlight_bg": "#ff6b35",  # Highlight background (bright orange)
+            "highlight_fg": "#000000",  # Highlight text color (black)
         },
         "ocean": {
             "name": "Ocean",
@@ -102,6 +108,8 @@ class ThemeManager:
             "entry_bg": "#1a2b3a",     # Entry field background
             "entry_fg": "#b8d4e3",     # Entry field text color
             "entry_insert_bg": "#64b5f6", # Entry field cursor color
+            "highlight_bg": "#64b5f6",  # Highlight background (bright blue)
+            "highlight_fg": "#000000",  # Highlight text color (black)
         },
         "forest": {
             "name": "Forest",
@@ -122,6 +130,8 @@ class ThemeManager:
             "entry_bg": "#2a3f2a",     # Entry field background
             "entry_fg": "#c8e6c9",     # Entry field text color
             "entry_insert_bg": "#4caf50", # Entry field cursor color
+            "highlight_bg": "#4caf50",  # Highlight background (bright green)
+            "highlight_fg": "#000000",  # Highlight text color (black)
         },
         "midnight": {
             "name": "Midnight",
@@ -142,6 +152,8 @@ class ThemeManager:
             "entry_bg": "#111111",     # Entry field background
             "entry_fg": "#00ff00",     # Entry field text color
             "entry_insert_bg": "#ffffff", # Entry field cursor color
+            "highlight_bg": "#00ff00",  # Highlight background (matrix green)
+            "highlight_fg": "#000000",  # Highlight text color (black)
         },
         "sepia": {
             "name": "Sepia",
@@ -162,6 +174,8 @@ class ThemeManager:
             "entry_bg": "#f4f1e8",     # Entry field background
             "entry_fg": "#5d4037",     # Entry field text color
             "entry_insert_bg": "#8d6e63", # Entry field cursor color
+            "highlight_bg": "#8d6e63",  # Highlight background (medium brown)
+            "highlight_fg": "#ffffff",  # Highlight text color (white)
         },
         "high_contrast": {
             "name": "High Contrast",
@@ -182,6 +196,8 @@ class ThemeManager:
             "entry_bg": "#ffffff",     # Entry field background
             "entry_fg": "#000000",     # Entry field text color
             "entry_insert_bg": "#000000", # Entry field cursor color (black)
+            "highlight_bg": "#ffff00",  # Highlight background (bright yellow)
+            "highlight_fg": "#000000",  # Highlight text color (black)
         }
     }
     
