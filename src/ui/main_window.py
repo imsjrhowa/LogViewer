@@ -140,6 +140,9 @@ class LogViewerApp(tk.Tk):
         
         # Bind window close event to save configuration
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
+        
+        # Bind window resize events to ensure toolbar remains visible
+        self.bind('<Configure>', self._on_window_resize)
 
     def _build_ui(self):
         """
@@ -218,38 +221,46 @@ class LogViewerApp(tk.Tk):
         toolbar = ttk.Frame(self, padding=(8, 4))
         toolbar.pack(fill=tk.X)
 
-        # File path display
-        self.path_label = ttk.Label(toolbar, text="No file selected", width=80)
-        self.path_label.pack(side=tk.LEFT, padx=(0, 8))
+        # Left section - File path and main controls
+        left_section = ttk.Frame(toolbar)
+        left_section.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # File path display - make it expandable and responsive
+        self.path_label = ttk.Label(left_section, text="No file selected")
+        self.path_label.pack(side=tk.LEFT, padx=(0, 8), fill=tk.X, expand=True)
 
+        # Center section - Main controls
+        center_section = ttk.Frame(toolbar)
+        center_section.pack(side=tk.LEFT, padx=(8, 8))
+        
         # Refresh rate control
-        ttk.Label(toolbar, text="Refresh (ms)").pack(side=tk.LEFT)
-        refresh_entry = ttk.Spinbox(toolbar, from_=100, to=5000, textvariable=self.refresh_ms, width=6)
+        ttk.Label(center_section, text="Refresh (ms)").pack(side=tk.LEFT)
+        refresh_entry = ttk.Spinbox(center_section, from_=100, to=5000, textvariable=self.refresh_ms, width=6)
         refresh_entry.pack(side=tk.LEFT, padx=(4, 10))
 
         # Display options
-        ttk.Checkbutton(toolbar, text="Auto-scroll", variable=self.autoscroll).pack(side=tk.LEFT)
-        ttk.Checkbutton(toolbar, text="Wrap", variable=self.wrap, command=self._apply_wrap).pack(side=tk.LEFT, padx=(8, 8))
-        ttk.Checkbutton(toolbar, text="Line Numbers", variable=self.show_line_numbers, command=self._toggle_line_numbers).pack(side=tk.LEFT, padx=(8, 8))
+        ttk.Checkbutton(center_section, text="Auto-scroll", variable=self.autoscroll).pack(side=tk.LEFT)
+        ttk.Checkbutton(center_section, text="Wrap", variable=self.wrap, command=self._apply_wrap).pack(side=tk.LEFT, padx=(8, 8))
+        ttk.Checkbutton(center_section, text="Line Numbers", variable=self.show_line_numbers, command=self._toggle_line_numbers).pack(side=tk.LEFT, padx=(8, 8))
         
         # Performance settings
-        ttk.Label(toolbar, text="Max lines").pack(side=tk.LEFT)
-        ttk.Spinbox(toolbar, from_=1000, to=200000, increment=1000, textvariable=self.max_lines, width=7).pack(side=tk.LEFT, padx=(4, 8))
+        ttk.Label(center_section, text="Max lines").pack(side=tk.LEFT)
+        ttk.Spinbox(center_section, from_=1000, to=200000, increment=1000, textvariable=self.max_lines, width=7).pack(side=tk.LEFT, padx=(4, 8))
 
         # Control buttons
-        self.pause_btn = ttk.Button(toolbar, text="Pause", command=self._toggle_pause)
+        self.pause_btn = ttk.Button(center_section, text="Pause", command=self._toggle_pause)
         self.pause_btn.pack(side=tk.LEFT, padx=(8, 4))
-        ttk.Button(toolbar, text="Clear", command=self._clear).pack(side=tk.LEFT)
+        ttk.Button(center_section, text="Clear", command=self._clear).pack(side=tk.LEFT)
 
         # Enhanced Filter controls section
-        filter_frame = ttk.Frame(toolbar)
+        filter_frame = ttk.Frame(center_section)
         filter_frame.pack(side=tk.LEFT, padx=(12, 4))
         
         # Filter mode dropdown
         ttk.Label(filter_frame, text="Mode:").pack(side=tk.LEFT)
         self.filter_mode_combo = ttk.Combobox(filter_frame, textvariable=self.filter_mode, 
                                              values=self.filter_manager.get_mode_display_names(),
-                                             width=12, state="readonly")
+                                             width=10, state="readonly")
         self.filter_mode_combo.pack(side=tk.LEFT, padx=(4, 0))
         
         # Filter entry with history dropdown
@@ -259,7 +270,7 @@ class LogViewerApp(tk.Tk):
         filter_entry_frame = ttk.Frame(filter_frame)
         filter_entry_frame.pack(side=tk.LEFT)
         
-        self.filter_entry = ttk.Entry(filter_entry_frame, textvariable=self.filter_text, width=30)
+        self.filter_entry = ttk.Entry(filter_entry_frame, textvariable=self.filter_text, width=20)
         self.filter_entry.pack(side=tk.LEFT)
         
         # Filter history dropdown button
@@ -291,15 +302,15 @@ class LogViewerApp(tk.Tk):
         self.filter_status_label = ttk.Label(filter_controls_frame, text="", width=8)
         self.filter_status_label.pack(side=tk.LEFT, padx=(4, 0))
         
-        # Theme indicator and controls (right side of toolbar)
-        theme_frame = ttk.Frame(toolbar)
-        theme_frame.pack(side=tk.RIGHT, padx=(8, 0))
+        # Right section - Theme controls
+        right_section = ttk.Frame(toolbar)
+        right_section.pack(side=tk.RIGHT, padx=(8, 0))
         
-        self.theme_label = ttk.Label(theme_frame, text="", width=15)
+        self.theme_label = ttk.Label(right_section, text="", width=15)
         self.theme_label.pack(side=tk.LEFT)
         
         # Theme preview button
-        self.theme_preview_btn = ttk.Button(theme_frame, text="🎨", width=3, command=self._show_theme_preview)
+        self.theme_preview_btn = ttk.Button(right_section, text="🎨", width=3, command=self._show_theme_preview)
         self.theme_preview_btn.pack(side=tk.LEFT, padx=(4, 0))
         
         # Bind filter events for real-time updates
@@ -388,6 +399,24 @@ class LogViewerApp(tk.Tk):
         y = int((screen_height - window_height) / 2)
         
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+    
+    def _on_window_resize(self, event):
+        """
+        Handle window resize events to ensure toolbar remains visible.
+        
+        Args:
+            event: Tkinter configure event
+        """
+        # Only handle main window resize events (not child widget events)
+        if event.widget == self:
+            # Force update of toolbar layout
+            self.update_idletasks()
+            
+            # Ensure minimum window width to keep toolbar visible
+            min_width = 800  # Minimum width to show essential controls
+            if event.width < min_width:
+                # Don't allow window to be smaller than minimum
+                self.geometry(f"{min_width}x{event.height}")
     
     def _load_theme_preference(self):
         """

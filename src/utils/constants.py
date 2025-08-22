@@ -8,7 +8,7 @@ including default values, configuration keys, and application settings.
 
 # Application metadata
 APP_NAME = "Log Viewer"
-APP_VERSION = "v0.1"
+APP_VERSION = "v0.2"
 APP_DESCRIPTION = "Real-time log file monitor with advanced filtering"
 APP_AUTHOR = "Log Viewer Team"
 
