@@ -12,7 +12,7 @@ import os
 import sys
 import json
 from typing import Dict, Any
-from ..utils.constants import (
+from src.utils.constants import (
     CONFIG_DIR_WINDOWS, CONFIG_DIR_UNIX, CONFIG_FILENAME,
     MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MAX_WINDOW_WIDTH, MAX_WINDOW_HEIGHT
 )

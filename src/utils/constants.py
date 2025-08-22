@@ -34,6 +34,7 @@ MAX_FILTER_HISTORY = 20
 FILTER_DEBOUNCE_MS = 150
 
 # Theme constants
+# All available themes - using single icon for all
 THEME_NAMES = {
     "dark": "Dark",
     "light": "Light", 
@@ -45,6 +46,9 @@ THEME_NAMES = {
     "high_contrast": "High Contrast"
 }
 
+# All themes are now available (using single icon)
+AVAILABLE_THEMES = ["dark", "light", "sunset", "ocean", "forest", "midnight", "sepia", "high_contrast"]
+
 # Configuration file paths
 CONFIG_DIR_WINDOWS = "AppData\\Local\\LogViewer"
 CONFIG_DIR_UNIX = "~/.logviewer"
@@ -54,3 +58,41 @@ FILTER_PREFS_FILENAME = "filter_prefs.txt"
 # Icon paths
 ICON_DIR = "icons"
 ICON_EXTENSION = ".ico"
+
+# Theme validation utilities
+def get_available_themes() -> list[str]:
+    """
+    Get list of available themes that are fully supported.
+    
+    Returns:
+        List of theme identifier strings
+    """
+    return AVAILABLE_THEMES.copy()
+
+def is_theme_available(theme_name: str) -> bool:
+    """
+    Check if a theme is fully available.
+    
+    Args:
+        theme_name: Name of theme to check
+        
+    Returns:
+        True if theme is fully available, False otherwise
+    """
+    return theme_name in AVAILABLE_THEMES
+
+def validate_theme_name(theme_name: str) -> str:
+    """
+    Validate theme name and return a valid theme name.
+    
+    Args:
+        theme_name: Name of theme to validate
+        
+    Returns:
+        Valid theme name (falls back to default if invalid)
+    """
+    if theme_name in AVAILABLE_THEMES:
+        return theme_name
+    else:
+        print(f"Warning: Unknown theme '{theme_name}'. Falling back to default theme.")
+        return DEFAULT_THEME

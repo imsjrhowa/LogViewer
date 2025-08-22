@@ -11,7 +11,7 @@ for real-time log monitoring with minimal resource usage.
 import os
 import io
 from typing import Optional
-from ..utils.constants import DEFAULT_ENCODING, MAX_FILE_SIZE_FOR_FULL_LOAD
+from src.utils.constants import DEFAULT_ENCODING, MAX_FILE_SIZE_FOR_FULL_LOAD
 
 
 class FileManager:
