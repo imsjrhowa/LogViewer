@@ -15,8 +15,8 @@ import collections
 from tkinter import ttk, filedialog, messagebox
 from typing import Optional
 
-from ..managers import ThemeManager, FilterManager, ConfigManager, FileManager
-from ..utils.constants import (
+from src.managers import ThemeManager, FilterManager, ConfigManager, FileManager
+from src.utils.constants import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION, APP_AUTHOR,
     MAX_LINES_DEFAULT, DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME,
     FILTER_DEBOUNCE_MS, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT,
@@ -169,7 +169,8 @@ class LogViewerApp(tk.Tk):
         # Theme submenu with checkmarks for current selection
         theme_menu = tk.Menu(view_menu, tearoff=0)
         self.theme_vars = {}
-        for theme_name in self.theme_manager.get_theme_names():
+        # Only show themes that are fully available (have icon files)
+        for theme_name in self.theme_manager.get_available_themes():
             var = tk.BooleanVar(value=(theme_name == self.theme_manager.current_theme))
             self.theme_vars[theme_name] = var
             theme_menu.add_checkbutton(
@@ -435,22 +436,15 @@ class LogViewerApp(tk.Tk):
     
     def _set_app_icon(self):
         """
-        Set the application icon based on the current theme.
+        Set the application icon using the default blue icon for all themes.
         
-        Attempts to load a theme-specific icon file and falls back
-        to a default icon if the theme-specific one doesn't exist.
+        Uses a single default icon for all themes to simplify the icon system.
         """
         try:
-            current_theme = self.theme_manager.current_theme
-            icon_path = os.path.join(os.path.dirname(__file__), "..", "..", "icons", f"{current_theme}.ico")
-            
+            # Always use the default blue icon for all themes
+            icon_path = os.path.join(os.path.dirname(__file__), "..", "..", "icons", "default.ico")
             if os.path.exists(icon_path):
                 self.iconbitmap(icon_path)
-            else:
-                # Fallback to a generic icon if theme-specific one doesn't exist
-                fallback_path = os.path.join(os.path.dirname(__file__), "..", "..", "icons", "default.ico")
-                if os.path.exists(fallback_path):
-                    self.iconbitmap(fallback_path)
         except Exception:
             # Silently fail if icon setting fails
             pass
@@ -1397,9 +1391,9 @@ class LogViewerApp(tk.Tk):
         Cycle through available themes with keyboard shortcut.
         
         Allows users to quickly switch between themes using
-        Ctrl+T keyboard shortcut.
+        Ctrl+T keyboard shortcut. Only cycles through fully supported themes.
         """
-        themes = self.theme_manager.get_theme_names()
+        themes = self.theme_manager.get_available_themes()
         current_index = themes.index(self.theme_manager.current_theme)
         next_index = (current_index + 1) % len(themes)
         next_theme = themes[next_index]
@@ -1413,10 +1407,14 @@ class LogViewerApp(tk.Tk):
         keyboard shortcuts for theme switching.
         """
         info = "Available Themes:\n\n"
-        for theme_name in self.theme_manager.get_theme_names():
+        # Show all available themes
+        available_themes = self.theme_manager.get_available_themes()
+        for theme_name in available_themes:
             theme = self.theme_manager.get_theme(theme_name)
             current = " (Current)" if theme_name == self.theme_manager.current_theme else ""
             info += f"• {theme['name']}{current}\n"
+        
+        info += "\nNote: All themes use the same icon for consistency.\n"
         info += "\nUse Ctrl+T to cycle through themes\n"
         info += "Or use View → Theme menu"
         

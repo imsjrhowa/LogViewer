@@ -9,7 +9,7 @@ and theme preference persistence.
 """
 
 from typing import Dict, Any, List
-from ..utils.constants import DEFAULT_THEME
+from src.utils.constants import DEFAULT_THEME, AVAILABLE_THEMES, THEME_NAMES
 
 
 class ThemeManager:
@@ -208,10 +208,8 @@ class ThemeManager:
         Args:
             theme_name: Name of the initial theme to use
         """
-        self.current_theme = theme_name
-        # Fallback to default theme if specified theme doesn't exist
-        if theme_name not in self.THEMES:
-            self.current_theme = DEFAULT_THEME
+        # Validate and set the theme
+        self.current_theme = self.validate_theme_name(theme_name)
     
     def get_theme(self, theme_name: str = None) -> Dict[str, Any]:
         """
@@ -247,8 +245,12 @@ class ThemeManager:
             True if theme changed, False if theme doesn't exist
         """
         if theme_name in self.THEMES:
-            self.current_theme = theme_name
-            return True
+            # Validate the theme before setting it
+            validated_theme = self.validate_theme_name(theme_name)
+            if validated_theme != self.current_theme:
+                self.current_theme = validated_theme
+                return True
+            return False
         return False
     
     def get_theme_names(self) -> List[str]:
@@ -268,3 +270,50 @@ class ThemeManager:
             List of human-readable theme names
         """
         return [self.THEMES[name]["name"] for name in self.THEMES]
+    
+    def get_available_themes(self) -> List[str]:
+        """
+        Get list of available themes that have corresponding icon files.
+        
+        Returns:
+            List of theme identifier strings that are fully supported
+        """
+        return AVAILABLE_THEMES.copy()
+    
+    def get_available_theme_display_names(self) -> List[str]:
+        """
+        Get list of available theme display names for UI.
+        
+        Returns:
+            List of human-readable theme names for fully supported themes
+        """
+        return [self.THEMES[name]["name"] for name in AVAILABLE_THEMES if name in self.THEMES]
+    
+    def is_theme_available(self, theme_name: str) -> bool:
+        """
+        Check if a theme is fully available (has icon file).
+        
+        Args:
+            theme_name: Name of theme to check
+            
+        Returns:
+            True if theme is fully available, False otherwise
+        """
+        return theme_name in AVAILABLE_THEMES
+    
+    def validate_theme_name(self, theme_name: str) -> str:
+        """
+        Validate theme name and return a valid theme name.
+        
+        Args:
+            theme_name: Name of theme to validate
+            
+        Returns:
+            Valid theme name (falls back to default if invalid)
+        """
+        if theme_name in self.THEMES:
+            return theme_name
+        else:
+            # Theme doesn't exist - fall back to default
+            print(f"Warning: Unknown theme '{theme_name}'. Falling back to default theme.")
+            return DEFAULT_THEME

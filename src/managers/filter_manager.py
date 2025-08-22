@@ -10,7 +10,7 @@ comprehensive error handling for invalid patterns.
 
 import re
 from typing import Dict, Any, List
-from ..utils.constants import DEFAULT_FILTER_MODE, MAX_FILTER_HISTORY
+from src.utils.constants import DEFAULT_FILTER_MODE, MAX_FILTER_HISTORY
 
 
 class FilterManager:
