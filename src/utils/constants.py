@@ -11,6 +11,7 @@ APP_NAME = "Log Viewer"
 APP_VERSION = "v0.2"
 APP_DESCRIPTION = "Real-time log file monitor with advanced filtering"
 APP_AUTHOR = "Log Viewer Team"
+BUILD_NUMBER = 2
 
 # Application defaults
 MAX_LINES_DEFAULT = 10_000      # Maximum lines to keep in memory

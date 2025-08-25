@@ -20,7 +20,7 @@ from ..utils.constants import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION, APP_AUTHOR,
     MAX_LINES_DEFAULT, DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME,
     FILTER_DEBOUNCE_MS, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT,
-    LINE_NUMBER_WIDTH
+    LINE_NUMBER_WIDTH, BUILD_NUMBER
 )
 from .dialogs import SettingsDialog
 
@@ -50,7 +50,7 @@ class LogViewerApp(tk.Tk):
         # Initialize configuration manager first (needed for window setup)
         self.config_manager = ConfigManager()
         
-        self.title(f"{APP_NAME} {APP_VERSION}")
+        self.title(f"{APP_NAME} {APP_VERSION} - Build {BUILD_NUMBER}")
         
         # Get saved window geometry and apply it
         saved_geometry = self.config_manager.get_window_geometry()
@@ -217,101 +217,91 @@ class LogViewerApp(tk.Tk):
         self.bind('<Control-r>', lambda e: self._focus_filter())     # Focus filter (alternative)
         self.bind('<Control-R>', lambda e: self._focus_filter())     # Focus filter (alternative, Shift)
 
-        # Create main toolbar with controls
+        # Create a multi-row toolbar container
         toolbar = ttk.Frame(self, padding=(8, 4))
         toolbar.pack(fill=tk.X)
 
-        # Left section - File path and main controls
-        left_section = ttk.Frame(toolbar)
+        # Row 1: File path (left, expands) + Theme and Build (right)
+        row1 = ttk.Frame(toolbar)
+        row1.pack(fill=tk.X)
+
+        left_section = ttk.Frame(row1)
         left_section.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        
+
         # File path display - make it expandable and responsive
         self.path_label = ttk.Label(left_section, text="No file selected")
         self.path_label.pack(side=tk.LEFT, padx=(0, 8), fill=tk.X, expand=True)
 
-        # Center section - Main controls
-        center_section = ttk.Frame(toolbar)
-        center_section.pack(side=tk.LEFT, padx=(8, 8))
-        
-        # Refresh rate control
-        ttk.Label(center_section, text="Refresh (ms)").pack(side=tk.LEFT)
-        refresh_entry = ttk.Spinbox(center_section, from_=100, to=5000, textvariable=self.refresh_ms, width=6)
-        refresh_entry.pack(side=tk.LEFT, padx=(4, 10))
-
-        # Display options
-        ttk.Checkbutton(center_section, text="Auto-scroll", variable=self.autoscroll).pack(side=tk.LEFT)
-        ttk.Checkbutton(center_section, text="Wrap", variable=self.wrap, command=self._apply_wrap).pack(side=tk.LEFT, padx=(8, 8))
-        ttk.Checkbutton(center_section, text="Line Numbers", variable=self.show_line_numbers, command=self._toggle_line_numbers).pack(side=tk.LEFT, padx=(8, 8))
-        
-        # Performance settings
-        ttk.Label(center_section, text="Max lines").pack(side=tk.LEFT)
-        ttk.Spinbox(center_section, from_=1000, to=200000, increment=1000, textvariable=self.max_lines, width=7).pack(side=tk.LEFT, padx=(4, 8))
-
-        # Control buttons
-        self.pause_btn = ttk.Button(center_section, text="Pause", command=self._toggle_pause)
-        self.pause_btn.pack(side=tk.LEFT, padx=(8, 4))
-        ttk.Button(center_section, text="Clear", command=self._clear).pack(side=tk.LEFT)
-
-        # Enhanced Filter controls section
-        filter_frame = ttk.Frame(center_section)
-        filter_frame.pack(side=tk.LEFT, padx=(12, 4))
-        
-        # Filter mode dropdown
-        ttk.Label(filter_frame, text="Mode:").pack(side=tk.LEFT)
-        self.filter_mode_combo = ttk.Combobox(filter_frame, textvariable=self.filter_mode, 
-                                             values=self.filter_manager.get_mode_display_names(),
-                                             width=10, state="readonly")
-        self.filter_mode_combo.pack(side=tk.LEFT, padx=(4, 0))
-        
-        # Filter entry with history dropdown
-        ttk.Label(filter_frame, text="Filter:").pack(side=tk.LEFT, padx=(8, 4))
-        
-        # Filter entry frame for dropdown integration
-        filter_entry_frame = ttk.Frame(filter_frame)
-        filter_entry_frame.pack(side=tk.LEFT)
-        
-        self.filter_entry = ttk.Entry(filter_entry_frame, textvariable=self.filter_text, width=20)
-        self.filter_entry.pack(side=tk.LEFT)
-        
-        # Filter history dropdown button
-        self.filter_history_btn = ttk.Button(filter_entry_frame, text="▼", width=2,
-                                           command=self._show_filter_history)
-        self.filter_history_btn.pack(side=tk.LEFT)
-        
-        # Filter control buttons
-        filter_controls_frame = ttk.Frame(filter_frame)
-        filter_controls_frame.pack(side=tk.LEFT, padx=(4, 0))
-        
-        # Case sensitivity checkbox
-        self.case_sensitive_cb = ttk.Checkbutton(filter_controls_frame, text="Case", 
-                                                variable=self.case_sensitive, 
-                                                command=self._on_filter_change)
-        self.case_sensitive_cb.pack(side=tk.LEFT)
-        
-        # Clear filter button
-        self.clear_filter_btn = ttk.Button(filter_controls_frame, text="✕", width=3,
-                                         command=self._clear_filter)
-        self.clear_filter_btn.pack(side=tk.LEFT, padx=(4, 0))
-        
-        # Filter info button
-        self.filter_info_btn = ttk.Button(filter_controls_frame, text="ℹ", width=3,
-                                        command=self._show_filter_info)
-        self.filter_info_btn.pack(side=tk.LEFT, padx=(2, 0))
-        
-        # Filter status indicator
-        self.filter_status_label = ttk.Label(filter_controls_frame, text="", width=8)
-        self.filter_status_label.pack(side=tk.LEFT, padx=(4, 0))
-        
-        # Right section - Theme controls
-        right_section = ttk.Frame(toolbar)
+        right_section = ttk.Frame(row1)
         right_section.pack(side=tk.RIGHT, padx=(8, 0))
-        
+
         self.theme_label = ttk.Label(right_section, text="", width=15)
         self.theme_label.pack(side=tk.LEFT)
-        
+
         # Theme preview button
         self.theme_preview_btn = ttk.Button(right_section, text="🎨", width=3, command=self._show_theme_preview)
         self.theme_preview_btn.pack(side=tk.LEFT, padx=(4, 0))
+
+
+        # Row 2: Main controls (refresh, options, max lines, pause/clear)
+        controls_row = ttk.Frame(toolbar)
+        controls_row.pack(fill=tk.X, pady=(4, 0))
+
+        ttk.Label(controls_row, text="Refresh (ms)").pack(side=tk.LEFT)
+        refresh_entry = ttk.Spinbox(controls_row, from_=100, to=5000, textvariable=self.refresh_ms, width=6)
+        refresh_entry.pack(side=tk.LEFT, padx=(4, 10))
+
+        ttk.Checkbutton(controls_row, text="Auto-scroll", variable=self.autoscroll).pack(side=tk.LEFT)
+        ttk.Checkbutton(controls_row, text="Wrap", variable=self.wrap, command=self._apply_wrap).pack(side=tk.LEFT, padx=(8, 8))
+        ttk.Checkbutton(controls_row, text="Line Numbers", variable=self.show_line_numbers, command=self._toggle_line_numbers).pack(side=tk.LEFT, padx=(8, 8))
+
+        ttk.Label(controls_row, text="Max lines").pack(side=tk.LEFT)
+        ttk.Spinbox(controls_row, from_=1000, to=200000, increment=1000, textvariable=self.max_lines, width=7).pack(side=tk.LEFT, padx=(4, 8))
+
+        self.pause_btn = ttk.Button(controls_row, text="Pause", command=self._toggle_pause)
+        self.pause_btn.pack(side=tk.LEFT, padx=(8, 4))
+        ttk.Button(controls_row, text="Clear", command=self._clear).pack(side=tk.LEFT)
+
+        # Row 3: Enhanced Filter controls
+        filter_row = ttk.Frame(toolbar)
+        filter_row.pack(fill=tk.X, pady=(4, 0))
+
+        ttk.Label(filter_row, text="Mode:").pack(side=tk.LEFT)
+        self.filter_mode_combo = ttk.Combobox(filter_row, textvariable=self.filter_mode,
+                                             values=self.filter_manager.get_mode_display_names(),
+                                             width=10, state="readonly")
+        self.filter_mode_combo.pack(side=tk.LEFT, padx=(4, 0))
+
+        ttk.Label(filter_row, text="Filter:").pack(side=tk.LEFT, padx=(8, 4))
+
+        filter_entry_frame = ttk.Frame(filter_row)
+        filter_entry_frame.pack(side=tk.LEFT)
+
+        self.filter_entry = ttk.Entry(filter_entry_frame, textvariable=self.filter_text, width=20)
+        self.filter_entry.pack(side=tk.LEFT)
+
+        self.filter_history_btn = ttk.Button(filter_entry_frame, text="▼", width=2,
+                                           command=self._show_filter_history)
+        self.filter_history_btn.pack(side=tk.LEFT)
+
+        filter_controls_frame = ttk.Frame(filter_row)
+        filter_controls_frame.pack(side=tk.LEFT, padx=(4, 0))
+
+        self.case_sensitive_cb = ttk.Checkbutton(filter_controls_frame, text="Case",
+                                                variable=self.case_sensitive,
+                                                command=self._on_filter_change)
+        self.case_sensitive_cb.pack(side=tk.LEFT)
+
+        self.clear_filter_btn = ttk.Button(filter_controls_frame, text="✕", width=3,
+                                         command=self._clear_filter)
+        self.clear_filter_btn.pack(side=tk.LEFT, padx=(4, 0))
+
+        self.filter_info_btn = ttk.Button(filter_controls_frame, text="ℹ", width=3,
+                                        command=self._show_filter_info)
+        self.filter_info_btn.pack(side=tk.LEFT, padx=(2, 0))
+
+        self.filter_status_label = ttk.Label(filter_controls_frame, text="", width=8)
+        self.filter_status_label.pack(side=tk.LEFT, padx=(4, 0))
         
         # Bind filter events for real-time updates
         self.filter_text.trace_add('write', lambda *args: self._on_filter_change())
