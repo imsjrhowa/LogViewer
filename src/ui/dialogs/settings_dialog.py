@@ -11,8 +11,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Dict, Any
 
-from ...managers import ConfigManager, ThemeManager
-from ...utils.constants import DEFAULT_THEME
+from src.managers import ConfigManager, ThemeManager
+from src.utils.constants import DEFAULT_THEME
 
 
 class SettingsDialog(tk.Toplevel):
@@ -161,6 +161,17 @@ class SettingsDialog(tk.Toplevel):
         self.auto_scroll_var = tk.BooleanVar()
         ttk.Checkbutton(options_frame, text="Auto-scroll to End", 
                        variable=self.auto_scroll_var).pack(anchor=tk.W)
+        
+        # Icon settings
+        icon_frame = ttk.LabelFrame(display_frame, text="Application Icon", padding="5")
+        icon_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(icon_frame, text="Icon:").pack(anchor=tk.W)
+        self.icon_var = tk.StringVar()
+        icon_combo = ttk.Combobox(icon_frame, textvariable=self.icon_var, 
+                                 values=["default.ico", "dark.ico", "light.ico", "sunset.ico"], 
+                                 width=20, state="readonly")
+        icon_combo.pack(anchor=tk.W, pady=(5, 0))
     
     def _create_performance_tab(self):
         """Create the performance settings tab."""
@@ -187,13 +198,7 @@ class SettingsDialog(tk.Toplevel):
                                    textvariable=self.max_lines_var, width=10)
         max_lines_spin.pack(anchor=tk.W, pady=(5, 0))
         
-        # Performance options
-        perf_options_frame = ttk.LabelFrame(perf_frame, text="Performance Options", padding="5")
-        perf_options_frame.pack(fill=tk.X)
-        
-        self.enable_undo_var = tk.BooleanVar()
-        ttk.Checkbutton(perf_options_frame, text="Enable Undo (may impact performance)", 
-                       variable=self.enable_undo_var).pack(anchor=tk.W)
+
     
     def _create_theme_tab(self):
         """Create the theme settings tab."""
@@ -302,7 +307,6 @@ class SettingsDialog(tk.Toplevel):
         # Performance settings
         self.refresh_rate_var.set(self.config_manager.get('display.refresh_rate', 500))
         self.max_lines_var.set(self.config_manager.get('display.max_lines', 10000))
-        self.enable_undo_var.set(self.config_manager.get('display.enable_undo', False))
         
         # Theme settings
         current_theme = self.config_manager.get('theme.current', DEFAULT_THEME)
@@ -326,8 +330,11 @@ class SettingsDialog(tk.Toplevel):
         
         # Update theme preview
         self._update_theme_preview()
+        
+        # Icon settings
+        self.icon_var.set(self.config_manager.get('display.icon', 'default.ico'))
     
-    def _update_theme_preview(self):
+    def _update_theme_preview(self, event=None):
         """Update the theme preview text."""
         try:
             # Get selected theme
@@ -363,6 +370,8 @@ The theme will be applied to the entire application when you click OK or Apply."
         except Exception:
             pass
     
+
+    
     def _reset_to_defaults(self):
         """Reset all settings to default values."""
         if messagebox.askyesno("Reset Settings", 
@@ -381,11 +390,11 @@ The theme will be applied to the entire application when you click OK or Apply."
             self.config_manager.set('display.show_line_numbers', self.show_line_numbers_var.get())
             self.config_manager.set('display.word_wrap', self.word_wrap_var.get())
             self.config_manager.set('display.auto_scroll', self.auto_scroll_var.get())
+            self.config_manager.set('display.icon', self.icon_var.get())
             
             # Save performance settings
             self.config_manager.set('display.refresh_rate', self.refresh_rate_var.get())
             self.config_manager.set('display.max_lines', self.max_lines_var.get())
-            self.config_manager.set('display.enable_undo', self.enable_undo_var.get())
             
             # Save theme settings
             theme_display_name = self.theme_var.get()
@@ -411,7 +420,9 @@ The theme will be applied to the entire application when you click OK or Apply."
             # Save configuration
             self.config_manager.save_config()
             
-            messagebox.showinfo("Settings Applied", "Settings have been applied and saved.")
+            # Refresh the main window's UI to reflect the new settings immediately
+            if hasattr(self.master, '_refresh_ui_from_config'):
+                self.master._refresh_ui_from_config()
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save settings:\n{str(e)}")
