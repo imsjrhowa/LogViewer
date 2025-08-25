@@ -18,7 +18,8 @@ try:
     from src.ui.main_window import LogViewerApp
     from src.utils.constants import (
         APP_NAME, APP_VERSION, APP_DESCRIPTION,
-        DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME
+        DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME, AVAILABLE_THEMES,
+        validate_theme_name
     )
 except ImportError:
     # Fallback for direct execution
@@ -26,7 +27,8 @@ except ImportError:
     from ui.main_window import LogViewerApp
     from utils.constants import (
         APP_NAME, APP_VERSION, APP_DESCRIPTION,
-        DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME
+        DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME, AVAILABLE_THEMES,
+        validate_theme_name
     )
 
 
@@ -39,7 +41,7 @@ def main():
     """
     # Ensure constants are not None (fallback safety)
     app_name = APP_NAME if APP_NAME else "Log Viewer"
-    app_version = APP_VERSION if APP_VERSION else "v0.1"
+    app_version = APP_VERSION if APP_VERSION else "vX.X"
     app_description = APP_DESCRIPTION if APP_DESCRIPTION else "Real-time log file monitor with advanced filtering"
     
     parser = argparse.ArgumentParser(
@@ -53,12 +55,17 @@ def main():
     parser.add_argument('--encoding', '-e', default=DEFAULT_ENCODING, 
                        help='File encoding (default auto; try utf-16 on Windows logs)')
     parser.add_argument('--theme', '-t', default=DEFAULT_THEME, 
-                       choices=['dark', 'light', 'sunset', 'ocean', 'forest', 'midnight', 'sepia', 'high_contrast'], 
+                       choices=AVAILABLE_THEMES, 
                        help='Color theme (default dark)')
     args = parser.parse_args()
 
+    # Validate theme argument
+    validated_theme = validate_theme_name(args.theme)
+    if validated_theme != args.theme:
+        print(f"Warning: Theme '{args.theme}' is not fully supported. Using '{validated_theme}' instead.")
+
     # Create and launch the main application
-    app = LogViewerApp(args.file, refresh_ms=args.refresh, encoding=args.encoding, theme=args.theme)
+    app = LogViewerApp(args.file, refresh_ms=args.refresh, encoding=args.encoding, theme=validated_theme)
     if app.file_manager:
         app.file_manager.encoding = args.encoding
     app.mainloop()

@@ -15,8 +15,8 @@ import collections
 from tkinter import ttk, filedialog, messagebox
 from typing import Optional
 
-from ..managers import ThemeManager, FilterManager, ConfigManager, FileManager
-from ..utils.constants import (
+from src.managers import ThemeManager, FilterManager, ConfigManager, FileManager
+from src.utils.constants import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION, APP_AUTHOR,
     MAX_LINES_DEFAULT, DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME,
     FILTER_DEBOUNCE_MS, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT,
@@ -169,7 +169,8 @@ class LogViewerApp(tk.Tk):
         # Theme submenu with checkmarks for current selection
         theme_menu = tk.Menu(view_menu, tearoff=0)
         self.theme_vars = {}
-        for theme_name in self.theme_manager.get_theme_names():
+        # Only show themes that are fully available (have icon files)
+        for theme_name in self.theme_manager.get_available_themes():
             var = tk.BooleanVar(value=(theme_name == self.theme_manager.current_theme))
             self.theme_vars[theme_name] = var
             theme_menu.add_checkbutton(
@@ -185,11 +186,7 @@ class LogViewerApp(tk.Tk):
         settings_menu = tk.Menu(menubar, tearoff=0)
         settings_menu.add_command(label="Preferences...", command=self._show_settings)
         settings_menu.add_separator()
-        settings_menu.add_command(label="Save Current Settings as Default", command=self._save_as_default)
         settings_menu.add_command(label="Reset to Defaults", command=self._reset_settings)
-        settings_menu.add_separator()
-        settings_menu.add_command(label="Export Settings...", command=self._export_settings)
-        settings_menu.add_command(label="Import Settings...", command=self._import_settings)
         menubar.add_cascade(label="Settings", menu=settings_menu)
         
         # Help menu for user assistance
@@ -260,7 +257,6 @@ class LogViewerApp(tk.Tk):
 
         self.pause_btn = ttk.Button(controls_row, text="Pause", command=self._toggle_pause)
         self.pause_btn.pack(side=tk.LEFT, padx=(8, 4))
-        ttk.Button(controls_row, text="Clear", command=self._clear).pack(side=tk.LEFT)
 
         # Row 3: Enhanced Filter controls
         filter_row = ttk.Frame(toolbar)
@@ -425,22 +421,26 @@ class LogViewerApp(tk.Tk):
     
     def _set_app_icon(self):
         """
-        Set the application icon based on the current theme.
+        Set the application icon based on user preference.
         
-        Attempts to load a theme-specific icon file and falls back
-        to a default icon if the theme-specific one doesn't exist.
+        Uses the icon selected in settings, with fallback to default icon.
         """
         try:
-            current_theme = self.theme_manager.current_theme
-            icon_path = os.path.join(os.path.dirname(__file__), "..", "..", "icons", f"{current_theme}.ico")
+            # Get user's preferred icon from configuration
+            preferred_icon = self.config_manager.get('display.icon', 'default.ico')
             
+            # Build path to the preferred icon
+            icon_path = os.path.join(os.path.dirname(__file__), "..", "..", "icons", preferred_icon)
+            
+            # Try to use preferred icon
             if os.path.exists(icon_path):
                 self.iconbitmap(icon_path)
-            else:
-                # Fallback to a generic icon if theme-specific one doesn't exist
-                fallback_path = os.path.join(os.path.dirname(__file__), "..", "..", "icons", "default.ico")
-                if os.path.exists(fallback_path):
-                    self.iconbitmap(fallback_path)
+                return
+            
+            # Fallback to default icon if preferred doesn't exist
+            fallback_path = os.path.join(os.path.dirname(__file__), "..", "..", "icons", "default.ico")
+            if os.path.exists(fallback_path):
+                self.iconbitmap(fallback_path)
         except Exception:
             # Silently fail if icon setting fails
             pass
@@ -1202,18 +1202,7 @@ class LogViewerApp(tk.Tk):
         self.pause_btn.config(text="Resume" if self.paused.get() else "Pause")
         self._set_status("Paused" if self.paused.get() else "Running")
     
-    def _clear(self):
-        """
-        Clear the text display.
-        
-        Removes all content from the text widget and updates line numbers.
-        """
-        self.text.delete('1.0', tk.END)
-        
-        # Clear all highlighting tags
-        self._clear_highlighting()
-        
-        self._update_line_numbers()
+
     
     def _toggle_wrap(self):
         """
@@ -1387,9 +1376,9 @@ class LogViewerApp(tk.Tk):
         Cycle through available themes with keyboard shortcut.
         
         Allows users to quickly switch between themes using
-        Ctrl+T keyboard shortcut.
+        Ctrl+T keyboard shortcut. Only cycles through fully supported themes.
         """
-        themes = self.theme_manager.get_theme_names()
+        themes = self.theme_manager.get_available_themes()
         current_index = themes.index(self.theme_manager.current_theme)
         next_index = (current_index + 1) % len(themes)
         next_theme = themes[next_index]
@@ -1403,10 +1392,14 @@ class LogViewerApp(tk.Tk):
         keyboard shortcuts for theme switching.
         """
         info = "Available Themes:\n\n"
-        for theme_name in self.theme_manager.get_theme_names():
+        # Show all available themes
+        available_themes = self.theme_manager.get_available_themes()
+        for theme_name in available_themes:
             theme = self.theme_manager.get_theme(theme_name)
             current = " (Current)" if theme_name == self.theme_manager.current_theme else ""
             info += f"• {theme['name']}{current}\n"
+        
+        info += "\nNote: Icon can be customized in Settings → Display → Application Icon.\n"
         info += "\nUse Ctrl+T to cycle through themes\n"
         info += "Or use View → Theme menu"
         
@@ -1517,27 +1510,45 @@ class LogViewerApp(tk.Tk):
         except Exception:
             pass  # Silently fail if we can't save preferences
     
+    def _refresh_ui_from_config(self):
+        """
+        Refresh UI state from configuration to sync checkboxes and other settings.
+        
+        Called after settings dialog is closed to ensure UI reflects current configuration.
+        """
+        try:
+            # Refresh display settings
+            self.wrap.set(self.config_manager.get('display.word_wrap', False))
+            self.autoscroll.set(self.config_manager.get('display.auto_scroll', True))
+            self.show_line_numbers.set(self.config_manager.get('display.show_line_numbers', True))
+            self.refresh_ms.set(self.config_manager.get('display.refresh_rate', DEFAULT_REFRESH_MS))
+            self.max_lines.set(self.config_manager.get('display.max_lines', MAX_LINES_DEFAULT))
+            
+            # Apply any changed settings immediately
+            self._apply_wrap()
+            self._toggle_line_numbers()
+            
+        except Exception as e:
+            print(f"Warning: Could not refresh UI from configuration: {e}")
+    
 
     
     def _show_settings(self):
         """Show the settings/preferences dialog."""
-        SettingsDialog(self, self.config_manager, self.theme_manager)
-    
-    def _save_as_default(self):
-        """Save current application state as default settings."""
-        messagebox.showinfo("Save Defaults", "Save as default will be implemented in the next phase.")
+        dialog = SettingsDialog(self, self.config_manager, self.theme_manager)
+        
+        # Wait for dialog to close, then refresh UI state
+        self.wait_window(dialog)
+        
+        # Refresh icon in case it was changed in settings
+        self._set_app_icon()
+        
+        # Refresh UI state from configuration to sync checkboxes and other settings
+        self._refresh_ui_from_config()
     
     def _reset_settings(self):
         """Reset all settings to default values."""
         messagebox.showinfo("Reset Settings", "Reset settings will be implemented in the next phase.")
-    
-    def _export_settings(self):
-        """Export current settings to a file."""
-        messagebox.showinfo("Export Settings", "Export settings will be implemented in the next phase.")
-    
-    def _import_settings(self):
-        """Import settings from a file."""
-        messagebox.showinfo("Import Settings", "Import settings will be implemented in the next phase.")
     
     def _show_filter_help(self):
         """Show help information for the filtering system."""
