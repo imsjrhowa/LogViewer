@@ -18,7 +18,7 @@ from typing import Optional
 from src.managers import ThemeManager, FilterManager, ConfigManager, FileManager
 from src.utils.constants import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION, APP_AUTHOR,
-    MAX_LINES_DEFAULT, DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME,
+    DEFAULT_REFRESH_MS, DEFAULT_ENCODING, DEFAULT_THEME,
     FILTER_DEBOUNCE_MS, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT,
     LINE_NUMBER_WIDTH, BUILD_NUMBER
 )
@@ -90,7 +90,6 @@ class LogViewerApp(tk.Tk):
         self.wrap = tk.BooleanVar(value=self.config_manager.get('display.word_wrap', False))
         self.show_line_numbers = tk.BooleanVar(value=self.config_manager.get('display.show_line_numbers', True))
         self.paused = tk.BooleanVar(value=False)
-        self.max_lines = tk.IntVar(value=self.config_manager.get('display.max_lines', MAX_LINES_DEFAULT))
 
         # Filtering variables
         self.filter_text = tk.StringVar(value="")
@@ -99,7 +98,7 @@ class LogViewerApp(tk.Tk):
         self._filter_job = None  # Debounce handle for filter updates
 
         # Data storage for efficient filtering and display
-        self._line_buffer = collections.deque(maxlen=MAX_LINES_DEFAULT)  # Raw lines storage
+        self._line_buffer = collections.deque()  # Raw lines storage - no size limit
         self._filtered_lines = []  # Store filtered lines with original line numbers
 
         # Build the user interface
@@ -252,8 +251,7 @@ class LogViewerApp(tk.Tk):
         ttk.Checkbutton(controls_row, text="Wrap", variable=self.wrap, command=self._apply_wrap).pack(side=tk.LEFT, padx=(8, 8))
         ttk.Checkbutton(controls_row, text="Line Numbers", variable=self.show_line_numbers, command=self._toggle_line_numbers).pack(side=tk.LEFT, padx=(8, 8))
 
-        ttk.Label(controls_row, text="Max lines").pack(side=tk.LEFT)
-        ttk.Spinbox(controls_row, from_=1000, to=200000, increment=1000, textvariable=self.max_lines, width=7).pack(side=tk.LEFT, padx=(4, 8))
+
 
         self.pause_btn = ttk.Button(controls_row, text="Pause", command=self._toggle_pause)
         self.pause_btn.pack(side=tk.LEFT, padx=(8, 4))
@@ -522,8 +520,8 @@ class LogViewerApp(tk.Tk):
         """
         Open a log file for monitoring.
         
-        Initializes the file manager and loads initial content if the file
-        is small enough. Handles file opening errors gracefully.
+        Always reads the entire file initially, then starts monitoring for updates.
+        Uses chunked reading for large files to manage memory efficiently.
         
         Args:
             path: Path to the log file to open
@@ -531,20 +529,24 @@ class LogViewerApp(tk.Tk):
         """
         self.path = path
         self.path_label.config(text=path)
+        
         try:
             if not self.file_manager:
                 self.file_manager = FileManager(path)
             self.file_manager.path = path
 
-            # If small file (<2MB), show existing contents; else start tailing from end
-            start_at_end = self.file_manager.should_start_at_end()
-            self.file_manager.open(start_at_end=start_at_end)
-            if not start_at_end:
-                # Load initial chunk for small files
-                text = self.file_manager.read_new_text()
-                if text:
-                    self._append(text)
-            self._set_status("Opened")
+            # Always read the entire file initially
+            self._set_status("Loading file...")
+            self.update()  # Force UI update to show loading status
+            
+            # Read entire file with chunked reading for large files
+            text = self.file_manager.read_entire_file()
+            if text:
+                self._append(text)
+                self._set_status(f"File loaded ({len(text.splitlines()):,} lines)")
+            else:
+                self._set_status("File opened (empty)")
+                
         except Exception as e:
             messagebox.showerror("Error", "Failed to open file:\n{}".format(e))
             self._set_status("Open failed")
@@ -586,7 +588,6 @@ class LogViewerApp(tk.Tk):
             
             # Save current settings
             self.config_manager.set('display.refresh_rate', self.refresh_ms.get())
-            self.config_manager.set('display.max_lines', self.max_lines.get())
             self.config_manager.set('display.auto_scroll', self.autoscroll.get())
             self.config_manager.set('display.word_wrap', self.wrap.get())
             self.config_manager.set('display.show_line_numbers', self.show_line_numbers.get())
@@ -722,7 +723,7 @@ class LogViewerApp(tk.Tk):
         Clear the current filter.
         
         Resets filter text, clears filtered lines cache, and
-        rebuilds the view to show all content.
+        restores the original unfiltered view.
         """
         self.filter_text.set("")
         self.filter_manager.clear_filter()
@@ -731,7 +732,8 @@ class LogViewerApp(tk.Tk):
         # Clear all highlighting tags
         self._clear_highlighting()
         
-        self._rebuild_view()
+        # Restore original unfiltered view
+        self._restore_original_view()
         self._set_status("Filter cleared")
     
     def _rebuild_view(self):
@@ -743,6 +745,10 @@ class LogViewerApp(tk.Tk):
         accurate reference.
         """
         try:
+            # If no active filter, restore original view
+            if not self.filter_manager.current_filter:
+                self._restore_original_view()
+                return
             
             # Clear current display
             self.text.delete('1.0', tk.END)
@@ -766,14 +772,14 @@ class LogViewerApp(tk.Tk):
                 self._filtered_lines.append((i, line))
             
             # Now apply highlighting to the complete filtered content
-            if self.filter_manager.current_filter and matching_lines:
+            if matching_lines:
                 self._highlight_all_filter_matches()
                 
             # Force update to ensure highlighting is applied
             self.text.update_idletasks()
             
             # Ensure highlighting is applied even if the above didn't work
-            if self.filter_manager.current_filter:
+            if matching_lines:
                 self.after(100, self._refresh_highlighting)
             
             # Auto-scroll if configured and we were at the end
@@ -781,19 +787,51 @@ class LogViewerApp(tk.Tk):
                 self.text.see(tk.END)
             
             # Update status with filter information
-            if self.filter_manager.current_filter:
-                if self.filter_manager.last_error:
-                    self._set_status(f"Filter error: {self.filter_manager.last_error}")
-                else:
-                    self._set_status(f"Filtered: {matched_count}/{total_count} lines")
+            if self.filter_manager.last_error:
+                self._set_status(f"Filter error: {self.filter_manager.last_error}")
             else:
-                self._set_status(f"Showing all {total_count} lines")
+                self._set_status(f"Filtered: {matched_count}/{total_count} lines")
             
             # Update line numbers after rebuilding view
             self._update_line_numbers()
                 
         except Exception as e:
             self._set_status("Filter error: {}".format(e))
+    
+    def _restore_original_view(self):
+        """
+        Restore the original unfiltered view with all content.
+        
+        This method properly restores the original log view when filters are cleared,
+        ensuring line numbers and content are correctly aligned.
+        """
+        try:
+            # Clear current display
+            self.text.delete('1.0', tk.END)
+            
+            # Clear filtered lines tracking
+            self._filtered_lines = []
+            
+            # Insert all original lines from buffer
+            for line in self._line_buffer:
+                self.text.insert(tk.END, line)
+            
+            # Force update to ensure content is displayed
+            self.text.update_idletasks()
+            
+            # Auto-scroll if configured
+            if self.autoscroll.get():
+                self.text.see(tk.END)
+            
+            # Update line numbers for unfiltered content
+            self._update_line_numbers()
+            
+            # Update status
+            total_count = len(self._line_buffer)
+            self._set_status(f"Showing all {total_count} lines")
+            
+        except Exception as e:
+            self._set_status(f"Error restoring view: {e}")
     
     def _highlight_filter_matches(self, start_pos, end_pos, line_content):
         """
@@ -1442,8 +1480,6 @@ class LogViewerApp(tk.Tk):
             return
         at_end = (self.text.yview()[1] == 1.0)
         self._line_buffer.extend(lines)
-        # Dynamic buffer size based on Max lines control
-        self._buffer_trim()
         
         # Apply current filter to new lines
         matching_lines = []
@@ -1461,41 +1497,15 @@ class LogViewerApp(tk.Tk):
             # Force update to ensure highlighting is applied
             self.text.update_idletasks()
         
-        self._trim_if_needed()
         if self.autoscroll.get() and (at_end or self.paused.get() is False):
             self.text.see(tk.END)
         
         # Update line numbers after appending new text
         self._update_line_numbers()
     
-    def _buffer_trim(self):
-        """Ensure buffer keeps approximately the last N lines (N = max_lines)."""
-        try:
-            target = max(1000, int(self.max_lines.get() or MAX_LINES_DEFAULT))
-        except Exception:
-            target = MAX_LINES_DEFAULT
-        # collections.deque with maxlen handles trimming automatically if maxlen is set.
-        # Update maxlen dynamically to follow user control.
-        if self._line_buffer.maxlen != target:
-            tmp = collections.deque(self._line_buffer, maxlen=target)
-            self._line_buffer = tmp
+
     
-    def _trim_if_needed(self):
-        """
-        Trim text widget content if it exceeds maximum lines.
-        
-        Removes older lines from the beginning of the text widget
-        to maintain performance and memory usage within limits.
-        """
-        # Keep last N lines for memory safety
-        try:
-            max_lines = max(1000, int(self.max_lines.get() or MAX_LINES_DEFAULT))
-        except Exception:
-            max_lines = MAX_LINES_DEFAULT
-        total = int(self.text.index('end-1c').split('.')[0])
-        if total > max_lines:
-            cutoff = total - max_lines
-            self.text.delete('1.0', "{}.0".format(cutoff))
+
     
     # Settings and preferences methods
     def _save_theme_preference(self):
@@ -1522,7 +1532,6 @@ class LogViewerApp(tk.Tk):
             self.autoscroll.set(self.config_manager.get('display.auto_scroll', True))
             self.show_line_numbers.set(self.config_manager.get('display.show_line_numbers', True))
             self.refresh_ms.set(self.config_manager.get('display.refresh_rate', DEFAULT_REFRESH_MS))
-            self.max_lines.set(self.config_manager.get('display.max_lines', MAX_LINES_DEFAULT))
             
             # Apply any changed settings immediately
             self._apply_wrap()

@@ -49,7 +49,7 @@ class ConfigManager:
         },
         "display": {
             "refresh_rate": 500,         # Default refresh rate (ms)
-            "max_lines": 10000,          # Maximum lines to display
+    
             "auto_scroll": True,         # Auto-scroll by default
             "word_wrap": False,          # Word wrap by default
             "font_size": 11,             # Default font size

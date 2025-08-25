@@ -41,9 +41,6 @@ if errorlevel 1 (
 )
 
 echo.
-echo 🎉 Build completed successfully!
-echo 📁 Executable location: dist\LogViewer.exe
+echo Build completed successfully!
+echo Executable location: dist\LogViewer.exe
 echo.
-echo You can now distribute LogViewer.exe to users who don't have Python installed!
-echo.
-pause

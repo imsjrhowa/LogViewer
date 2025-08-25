@@ -11,10 +11,10 @@ APP_NAME = "Log Viewer"
 APP_VERSION = "v0.3"
 APP_DESCRIPTION = "Real-time log file monitor with advanced filtering"
 APP_AUTHOR = "Log Viewer Team"
-BUILD_NUMBER = 2
+BUILD_NUMBER = 12
 
 # Application defaults
-MAX_LINES_DEFAULT = 10_000      # Maximum lines to keep in memory
+
 DEFAULT_REFRESH_MS = 500        # Default refresh interval in milliseconds
 DEFAULT_ENCODING = "auto"       # Default encoding (auto-detection enabled)
 DEFAULT_THEME = "dark"          # Default color theme

@@ -8,7 +8,7 @@ This package contains utility modules including constants and helper functions.
 from .constants import *
 
 __all__ = [
-    'MAX_LINES_DEFAULT',
+
     'DEFAULT_REFRESH_MS',
     'DEFAULT_ENCODING',
     'DEFAULT_THEME',

@@ -38,16 +38,55 @@ def clean_build_dirs():
         except Exception as e:
             print(f"⚠️  Warning: Could not remove {spec_file}: {e}")
 
+def bump_build_number():
+    """Increment the build number in constants.py."""
+    constants_file = 'src/utils/constants.py'
+    
+    try:
+        # Read the current constants file
+        with open(constants_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Find and increment the build number
+        import re
+        build_pattern = r'BUILD_NUMBER\s*=\s*(\d+)'
+        match = re.search(build_pattern, content)
+        
+        if match:
+            current_build = int(match.group(1))
+            new_build = current_build + 1
+            print(f"📈 Bumping build number: {current_build} → {new_build}")
+            
+            # Replace the build number
+            new_content = re.sub(build_pattern, f'BUILD_NUMBER = {new_build}', content)
+            
+            # Write back to file
+            with open(constants_file, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            
+            print(f"✅ Build number updated to {new_build}")
+            return new_build
+        else:
+            print("⚠️  Could not find BUILD_NUMBER in constants.py")
+            return None
+            
+    except Exception as e:
+        print(f"⚠️  Warning: Could not bump build number: {e}")
+        return None
+
 def build_executable():
     """Build the executable using PyInstaller."""
     print("Building Log Viewer executable...")
     
+    # Bump build number first
+    new_build = bump_build_number()
+    
     # Get version info for the executable
     try:
-        # Import version constants
+        # Import version constants (after bumping)
         sys.path.insert(0, 'src')
-        from utils.constants import APP_NAME, APP_VERSION, APP_DESCRIPTION
-        version_string = f"{APP_NAME} {APP_VERSION}"
+        from utils.constants import APP_NAME, APP_VERSION, APP_DESCRIPTION, BUILD_NUMBER
+        version_string = f"{APP_NAME} {APP_VERSION} - Build {BUILD_NUMBER}"
     except ImportError:
         version_string = "LogViewer v0.1"
         print("⚠️  Could not import version info, using default")

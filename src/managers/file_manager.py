@@ -11,7 +11,7 @@ for real-time log monitoring with minimal resource usage.
 import os
 import io
 from typing import Optional
-from src.utils.constants import DEFAULT_ENCODING, MAX_FILE_SIZE_FOR_FULL_LOAD
+from src.utils.constants import DEFAULT_ENCODING
 
 
 class FileManager:
@@ -66,12 +66,12 @@ class FileManager:
             return "utf-8-sig"
         return None
 
-    def open(self, start_at_end=True):
+    def open(self, start_at_end=False):
         """
         Open the file for reading.
         
         Args:
-            start_at_end: If True, start reading from end of file
+            start_at_end: If True, start reading from end of file (legacy, not used)
             
         Returns:
             True if file opened successfully
@@ -90,14 +90,9 @@ class FileManager:
             enc = self._encoding_from_bom(self._fh)
             self.encoding = enc or "utf-8"
 
-        if start_at_end:
-            # Start reading from end of file (for tailing)
-            self._fh.seek(0, io.SEEK_END)
-            self._pos = self._fh.tell()
-        else:
-            # Start reading from beginning of file
-            self._fh.seek(0)
-            self._pos = 0
+        # Always start from beginning for initial load
+        self._fh.seek(0)
+        self._pos = 0
         return True
 
     def close(self):
@@ -138,6 +133,55 @@ class FileManager:
             except OSError:
                 pass
 
+    def read_entire_file(self, chunk_size: int = 1024 * 1024) -> str:
+        """
+        Read the entire file with chunked reading for large files.
+        
+        Args:
+            chunk_size: Size of chunks to read (default 1MB)
+            
+        Returns:
+            Entire file content as string
+        """
+        if not self._fh:
+            try:
+                self.open()
+            except OSError:
+                return ""
+
+        self._fh.seek(0)
+        content = []
+        
+        while True:
+            chunk = self._fh.read(chunk_size)
+            if not chunk:
+                break
+            content.append(chunk)
+        
+        # Combine all chunks
+        data = b''.join(content)
+        
+        # Heuristic: if we don't have a BOM and see lots of NULs, switch to utf-16-le
+        if self.encoding in ("utf-8", "utf-8-sig") and data and data.count(b"\x00") > len(data) // 4:
+            self.encoding = "utf-16-le"
+
+        try:
+            decoded_content = data.decode(self.encoding, errors="replace")
+            
+            # IMPORTANT: Set position to end for future tailing AFTER reading
+            # This ensures we start monitoring from the current end of file
+            self._pos = self._fh.tell()
+            
+            return decoded_content
+        except LookupError:
+            # Fallback to UTF-8 if encoding not supported
+            decoded_content = data.decode("utf-8", errors="replace")
+            
+            # Set position to end for future tailing
+            self._pos = self._fh.tell()
+            
+            return decoded_content
+
     def read_new_text(self) -> str:
         """
         Read new text from the file since last read.
@@ -150,16 +194,28 @@ class FileManager:
         """
         if not self._fh:
             try:
-                self.open(start_at_end=False)
+                self.open()
             except OSError:
                 return ""
 
         self._check_rotation_or_truncate()
+        
+        # Get current file size to check if there's new content
+        try:
+            current_size = os.path.getsize(self.path)
+            if current_size <= self._pos:
+                # No new content since last read
+                return ""
+        except OSError:
+            return ""
+        
+        # Seek to our last position and read new content
         self._fh.seek(self._pos)
         data = self._fh.read()
         if not data:
             return ""
 
+        # Update position to current end of file
         self._pos = self._fh.tell()
 
         # Heuristic: if we don't have a BOM and see lots of NULs, switch to utf-16-le
@@ -172,14 +228,4 @@ class FileManager:
             # Fallback to UTF-8 if encoding not supported
             return data.decode("utf-8", errors="replace")
     
-    def should_start_at_end(self) -> bool:
-        """
-        Determine if file should start reading from end.
-        
-        Returns:
-            True if file is large enough to start tailing from end
-        """
-        try:
-            return os.path.getsize(self.path) > MAX_FILE_SIZE_FOR_FULL_LOAD
-        except OSError:
-            return False
+

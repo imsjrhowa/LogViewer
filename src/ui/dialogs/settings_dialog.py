@@ -188,15 +188,7 @@ class SettingsDialog(tk.Toplevel):
                                  textvariable=self.refresh_rate_var, width=10)
         refresh_spin.pack(anchor=tk.W, pady=(5, 0))
         
-        # Memory settings
-        memory_frame = ttk.LabelFrame(perf_frame, text="Memory Management", padding="5")
-        memory_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Label(memory_frame, text="Maximum Lines to Keep:").pack(anchor=tk.W)
-        self.max_lines_var = tk.IntVar()
-        max_lines_spin = ttk.Spinbox(memory_frame, from_=1000, to=200000, increment=1000, 
-                                   textvariable=self.max_lines_var, width=10)
-        max_lines_spin.pack(anchor=tk.W, pady=(5, 0))
+
         
 
     
@@ -306,7 +298,7 @@ class SettingsDialog(tk.Toplevel):
         
         # Performance settings
         self.refresh_rate_var.set(self.config_manager.get('display.refresh_rate', 500))
-        self.max_lines_var.set(self.config_manager.get('display.max_lines', 10000))
+
         
         # Theme settings
         current_theme = self.config_manager.get('theme.current', DEFAULT_THEME)
@@ -394,7 +386,7 @@ The theme will be applied to the entire application when you click OK or Apply."
             
             # Save performance settings
             self.config_manager.set('display.refresh_rate', self.refresh_rate_var.get())
-            self.config_manager.set('display.max_lines', self.max_lines_var.get())
+    
             
             # Save theme settings
             theme_display_name = self.theme_var.get()
