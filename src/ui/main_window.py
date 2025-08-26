@@ -121,6 +121,9 @@ class LogViewerApp(tk.Tk):
         # Apply initial theme to all UI elements
         self._apply_theme()
         
+        # Force a theme refresh after window is fully initialized to ensure proper colors
+        self.after(100, self._force_theme_refresh)
+        
         # Check if we should open the last file from configuration
         if not self.path:  # Only if no file was passed via command line
             last_file_path = self.config_manager.get('file.last_file_path', '')
@@ -134,6 +137,9 @@ class LogViewerApp(tk.Tk):
             
         # Start the polling loop for file updates
         self.after(self.refresh_ms.get(), self._poll)
+        
+        # Start the heartbeat
+        self._start_heartbeat()
         
 
         
@@ -366,6 +372,64 @@ class LogViewerApp(tk.Tk):
         # Status bar for information display
         self.status = ttk.Label(self, relief=tk.SUNKEN, anchor=tk.W)
         self.status.pack(fill=tk.X)
+        
+        # Apply initial theme colors to status bar immediately
+        self._apply_initial_theme_colors()
+        
+        # Heartbeat variables
+        self._heartbeat_active = True
+        self._heartbeat_state = "active"  # active, paused, error
+        self._heartbeat_chars = {
+            "active": ["💓", "💗", "💓", "💗"],
+            "paused": ["⏸️", "⏸️", "⏸️", "⏸️"],
+            "error": ["⚠️", "⚠️", "⚠️", "⚠️"]
+        }
+        self._heartbeat_index = 0
+        self._heartbeat_interval = 1000  # 1 second
+        
+        # Initialize base status text
+        self._base_status_text = "Ready"
+    
+    def _apply_initial_theme_colors(self):
+        """Apply initial theme colors to status bar and other critical UI elements."""
+        try:
+            # Get the current theme from theme manager
+            theme = self.theme_manager.get_current_theme()
+            
+            # Apply theme colors to status bar immediately
+            self.status.configure(
+                background=theme["status_bg"],
+                foreground=theme["status_fg"]
+            )
+            
+            # Also apply to main window background
+            self.configure(bg=theme["bg"])
+            
+        except Exception:
+            # Silently fail if theme colors can't be applied initially
+            pass
+    
+    def _force_theme_refresh(self):
+        """Force a theme refresh to ensure all colors are properly applied."""
+        try:
+            # Get current theme and reapply critical colors
+            theme = self.theme_manager.get_current_theme()
+            
+            # Ensure status bar has correct colors
+            self.status.configure(
+                background=theme["status_bg"],
+                foreground=theme["status_fg"]
+            )
+            
+            # Ensure main window background is correct
+            self.configure(bg=theme["bg"])
+            
+            # Force update to ensure colors are applied
+            self.update_idletasks()
+            
+        except Exception:
+            # Silently fail if theme refresh can't be applied
+            pass
     
     def _center_window(self):
         """
@@ -494,6 +558,9 @@ class LogViewerApp(tk.Tk):
             foreground=theme["status_fg"]
         )
         
+        # Ensure status bar colors are properly set and not overridden
+        self.update_idletasks()
+        
         # Configure menu colors (limited support on some platforms)
         try:
             self.option_add('*Menu.background', theme["menu_bg"])
@@ -533,22 +600,36 @@ class LogViewerApp(tk.Tk):
         try:
             if not self.file_manager:
                 self.file_manager = FileManager(path)
+            else:
+                # Force re-detection of encoding for the file (even if same path)
+                self.file_manager.force_encoding_detection()
             self.file_manager.path = path
 
             # Always read the entire file initially
             self._set_status("Loading file...")
             self.update()  # Force UI update to show loading status
             
+            # Clear existing content and line buffer when opening a new file
+            if not first_open:
+                self._clear_current_view()
+            
             # Read entire file with chunked reading for large files
             text = self.file_manager.read_entire_file()
             if text:
-                self._append(text)
+                # For new files, use _load_file_content instead of _append
+                if not first_open:
+                    self._load_file_content(text)
+                else:
+                    self._append(text)
+                self._set_heartbeat_state("active")
                 self._set_status(f"File loaded ({len(text.splitlines()):,} lines)")
             else:
+                self._set_heartbeat_state("active")
                 self._set_status("File opened (empty)")
                 
         except Exception as e:
             messagebox.showerror("Error", "Failed to open file:\n{}".format(e))
+            self._set_heartbeat_state("error")
             self._set_status("Open failed")
     
     def _poll(self):
@@ -563,9 +644,11 @@ class LogViewerApp(tk.Tk):
                 new_text = self.file_manager.read_new_text()
                 if new_text:
                     self._append(new_text)
+                    self._set_heartbeat_state("active")
                     self._set_status("Updated")
         except Exception as e:
             # Non-fatal: show in status bar, keep polling
+            self._set_heartbeat_state("error")
             self._set_status("Error: {}".format(e))
         finally:
             # Reschedule polling
@@ -637,7 +720,103 @@ class LogViewerApp(tk.Tk):
                 base += "  •  size: {:,} bytes".format(size)
             except OSError:
                 pass
+        
+        # Store the base status text for heartbeat to use
+        self._base_status_text = base
+        
+        # Update status (heartbeat will add its indicator)
         self.status.config(text=base)
+    
+    def _start_heartbeat(self):
+        """Start the heartbeat animation to show application activity."""
+        if self._heartbeat_active:
+            self._update_heartbeat()
+    
+    def _update_heartbeat(self):
+        """Update the heartbeat indicator in the status bar."""
+        if not self._heartbeat_active:
+            return
+            
+        try:
+            # Get appropriate heartbeat character for current state
+            heartbeat_chars = self._heartbeat_chars[self._heartbeat_state]
+            heartbeat_char = heartbeat_chars[self._heartbeat_index]
+            
+            # Get the base status text (without heartbeat)
+            base_status = self._get_base_status_text()
+            
+            # Create status with heartbeat at fixed position (right side)
+            # Limit base status length to prevent overflow
+            max_base_length = 80  # Leave room for heartbeat indicator
+            if len(base_status) > max_base_length:
+                base_status = base_status[:max_base_length-3] + "..."
+            
+            # Format: [Time] Status | State Heartbeat
+            status_text = f"{base_status} | {self._heartbeat_state.title()} {heartbeat_char}"
+            
+            # Update status with heartbeat
+            self.status.config(text=status_text)
+            
+            # Cycle to next heartbeat character
+            self._heartbeat_index = (self._heartbeat_index + 1) % len(heartbeat_chars)
+            
+            # Schedule next heartbeat update
+            self.after(self._heartbeat_interval, self._update_heartbeat)
+            
+        except Exception:
+            # Silently fail to avoid breaking the main functionality
+            pass
+    
+    def _get_base_status_text(self):
+        """Get the base status text without heartbeat indicators."""
+        try:
+            # Use stored base status text if available
+            if hasattr(self, '_base_status_text'):
+                return self._base_status_text
+            
+            # Fallback: get current status text and clean it
+            current_text = self.status.cget("text")
+            
+            # Remove any existing heartbeat indicators and separator
+            for indicator in ["💓", "💗", "⏸️", "⚠️"]:
+                current_text = current_text.replace(indicator, "")
+            
+            # Remove the separator and state text
+            if " | " in current_text:
+                current_text = current_text.split(" | ")[0]
+            
+            return current_text.strip()
+        except Exception:
+            return ""
+    
+    def _stop_heartbeat(self):
+        """Stop the heartbeat animation."""
+        self._heartbeat_active = False
+    
+    def _set_heartbeat_state(self, state: str):
+        """
+        Set the heartbeat state to show different application statuses.
+        
+        Args:
+            state: One of "active", "paused", or "error"
+        """
+        if state in self._heartbeat_chars:
+            self._heartbeat_state = state
+            # Reset index for smooth transition
+            self._heartbeat_index = 0
+            
+            # Update status bar color based on state (if supported)
+            try:
+                if state == "error":
+                    self.status.configure(foreground="red")
+                elif state == "paused":
+                    self.status.configure(foreground="orange")
+                else:  # active - restore theme foreground color
+                    theme = self.theme_manager.get_current_theme()
+                    self.status.configure(foreground=theme["status_fg"])
+            except Exception:
+                # Silently fail if color change is not supported
+                pass
     
     # File operations
     def _choose_file(self):
@@ -649,7 +828,7 @@ class LogViewerApp(tk.Tk):
         """
         path = filedialog.askopenfilename(title="Choose log file")
         if path:
-            self._open_path(path, first_open=True)
+            self._open_path(path, first_open=False)
     
     # Filtering methods
     def _on_filter_change(self):
@@ -735,6 +914,29 @@ class LogViewerApp(tk.Tk):
         # Restore original unfiltered view
         self._restore_original_view()
         self._set_status("Filter cleared")
+    
+    def _clear_current_view(self):
+        """
+        Clear the current view and reset all buffers.
+        
+        Used when opening a new file to ensure clean state.
+        """
+        # Clear text widget
+        self.text.delete('1.0', tk.END)
+        
+        # Clear all buffers
+        self._line_buffer.clear()
+        self._filtered_lines = []
+        
+        # Clear any active filters
+        self.filter_text.set("")
+        self.filter_manager.clear_filter()
+        
+        # Clear highlighting
+        self._clear_highlighting()
+        
+        # Update line numbers
+        self._update_line_numbers()
     
     def _rebuild_view(self):
         """
@@ -1238,7 +1440,14 @@ class LogViewerApp(tk.Tk):
         """
         self.paused.set(not self.paused.get())
         self.pause_btn.config(text="Resume" if self.paused.get() else "Pause")
-        self._set_status("Paused" if self.paused.get() else "Running")
+        
+        # Update heartbeat state based on pause status
+        if self.paused.get():
+            self._set_heartbeat_state("paused")
+            self._set_status("Paused")
+        else:
+            self._set_heartbeat_state("active")
+            self._set_status("Running")
     
 
     
@@ -1463,6 +1672,35 @@ class LogViewerApp(tk.Tk):
         """
         self.filter_entry.focus_set()
         self.filter_entry.select_range(0, tk.END)
+    
+    def _load_file_content(self, s: str):
+        """
+        Load file content into the display, bypassing filters.
+        
+        Used when opening a new file to load all content without filtering.
+        
+        Args:
+            s: File content to load
+        """
+        # Clear existing content first
+        self.text.delete('1.0', tk.END)
+        self._line_buffer.clear()
+        self._filtered_lines = []
+        
+        # Insert the entire content at once to preserve formatting
+        self.text.insert('1.0', s)
+        
+        # Break content into lines and store in buffer (for filtering later)
+        lines = s.splitlines(True)  # keep line endings
+        if lines:
+            self._line_buffer.extend(lines)
+        
+        # Auto-scroll to end if configured
+        if self.autoscroll.get():
+            self.text.see(tk.END)
+        
+        # Update line numbers
+        self._update_line_numbers()
     
     def _append(self, s: str):
         """

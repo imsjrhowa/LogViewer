@@ -36,6 +36,7 @@ class FileManager:
         self._fh = None  # File handle for reading
         self._inode = None  # File inode for detecting rotation
         self._pos = 0  # Current file position
+        self._detected_encoding = None  # Store detected encoding to avoid re-detection
 
     def _encoding_from_bom(self, fh) -> Optional[str]:
         """
@@ -85,10 +86,11 @@ class FileManager:
         except Exception:
             self._inode = None
 
-        # Auto-detect encoding (BOM first)
-        if self.encoding == "auto":
+        # Auto-detect encoding (BOM first) - only if not already detected
+        if self.encoding == "auto" and self._detected_encoding is None:
             enc = self._encoding_from_bom(self._fh)
-            self.encoding = enc or "utf-8"
+            self._detected_encoding = enc or "utf-8"
+            self.encoding = self._detected_encoding
 
         # Always start from beginning for initial load
         self._fh.seek(0)
@@ -104,6 +106,19 @@ class FileManager:
             self._fh = None
             self._inode = None
             self._pos = 0
+    
+    def reset_encoding(self):
+        """Reset detected encoding - useful when opening a new file."""
+        self._detected_encoding = None
+        if self.encoding == "auto":
+            self.encoding = DEFAULT_ENCODING
+    
+    def force_encoding_detection(self):
+        """Force re-detection of encoding from file content."""
+        self._detected_encoding = None
+        # Close and reopen to ensure fresh encoding detection
+        if self._fh:
+            self.close()
 
     def _check_rotation_or_truncate(self):
         """
@@ -162,8 +177,12 @@ class FileManager:
         data = b''.join(content)
         
         # Heuristic: if we don't have a BOM and see lots of NULs, switch to utf-16-le
-        if self.encoding in ("utf-8", "utf-8-sig") and data and data.count(b"\x00") > len(data) // 4:
-            self.encoding = "utf-16-le"
+        # Only apply this heuristic once per file to avoid changing encoding mid-stream
+        if (self.encoding in ("utf-8", "utf-8-sig") and 
+            self._detected_encoding is None and 
+            data and data.count(b"\x00") > len(data) // 4):
+            self._detected_encoding = "utf-16-le"
+            self.encoding = self._detected_encoding
 
         try:
             decoded_content = data.decode(self.encoding, errors="replace")
@@ -175,6 +194,9 @@ class FileManager:
             return decoded_content
         except LookupError:
             # Fallback to UTF-8 if encoding not supported
+            if self._detected_encoding is None:
+                self._detected_encoding = "utf-8"
+                self.encoding = self._detected_encoding
             decoded_content = data.decode("utf-8", errors="replace")
             
             # Set position to end for future tailing
@@ -219,13 +241,20 @@ class FileManager:
         self._pos = self._fh.tell()
 
         # Heuristic: if we don't have a BOM and see lots of NULs, switch to utf-16-le
-        if self.encoding in ("utf-8", "utf-8-sig") and data and data.count(b"\x00") > len(data) // 4:
-            self.encoding = "utf-16-le"
+        # Only apply this heuristic once per file to avoid changing encoding mid-stream
+        if (self.encoding in ("utf-8", "utf-8-sig") and 
+            self._detected_encoding is None and 
+            data and data.count(b"\x00") > len(data) // 4):
+            self._detected_encoding = "utf-16-le"
+            self.encoding = self._detected_encoding
 
         try:
             return data.decode(self.encoding, errors="replace")
         except LookupError:
             # Fallback to UTF-8 if encoding not supported
+            if self._detected_encoding is None:
+                self._detected_encoding = "utf-8"
+                self.encoding = self._detected_encoding
             return data.decode("utf-8", errors="replace")
     
 
