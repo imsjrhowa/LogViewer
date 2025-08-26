@@ -119,6 +119,71 @@ class FileManager:
         # Close and reopen to ensure fresh encoding detection
         if self._fh:
             self.close()
+    
+    def _analyze_content_encoding(self, data: bytes) -> str:
+        """
+        Analyze content to determine the most likely encoding.
+        
+        Args:
+            data: Raw bytes to analyze
+            
+        Returns:
+            Suggested encoding string
+        """
+        if not data:
+            return self.encoding
+            
+        # Check for BOM first
+        if data.startswith(b"\xff\xfe"):
+            return "utf-16-le"
+        if data.startswith(b"\xfe\xff"):
+            return "utf-16-be"
+        if data.startswith(b"\xef\xbb\xbf"):
+            return "utf-8-sig"
+            
+        # Heuristic: analyze NUL byte patterns
+        nul_ratio = data.count(b"\x00") / len(data) if data else 0
+        
+        if nul_ratio > 0.25:  # More than 25% NULs suggests UTF-16
+            return "utf-16-le"
+        elif nul_ratio < 0.05:  # Less than 5% NULs suggests UTF-8
+            return "utf-8"
+        else:
+            # Middle ground - keep current encoding
+            return self.encoding
+    
+    def _detect_mixed_encoding(self, data: bytes) -> bool:
+        """
+        Detect if content appears to have mixed encoding.
+        
+        Args:
+            data: Raw bytes to analyze
+            
+        Returns:
+            True if mixed encoding is detected
+        """
+        if not data or len(data) < 10:
+            return False
+            
+        # Check for mixed patterns that suggest encoding issues
+        # Look for sequences that are neither valid UTF-8 nor UTF-16
+        
+        # Count valid UTF-8 sequences vs invalid ones
+        try:
+            data.decode('utf-8')
+            utf8_valid = True
+        except UnicodeDecodeError:
+            utf8_valid = False
+            
+        # Count valid UTF-16 sequences vs invalid ones  
+        try:
+            data.decode('utf-16-le')
+            utf16_valid = True
+        except UnicodeDecodeError:
+            utf16_valid = False
+            
+        # If neither encoding is valid, we likely have mixed content
+        return not (utf8_valid or utf16_valid)
 
     def _check_rotation_or_truncate(self):
         """
@@ -240,21 +305,23 @@ class FileManager:
         # Update position to current end of file
         self._pos = self._fh.tell()
 
-        # Heuristic: if we don't have a BOM and see lots of NULs, switch to utf-16-le
-        # Only apply this heuristic once per file to avoid changing encoding mid-stream
-        if (self.encoding in ("utf-8", "utf-8-sig") and 
-            self._detected_encoding is None and 
-            data and data.count(b"\x00") > len(data) // 4):
-            self._detected_encoding = "utf-16-le"
-            self.encoding = self._detected_encoding
+        # Continuous encoding detection for new content
+        # This helps catch cases where new content has different encoding characteristics
+        if data:
+            suggested_encoding = self._analyze_content_encoding(data)
+            if suggested_encoding != self.encoding:
+                print(f"Debug: Encoding changed from {self.encoding} to {suggested_encoding} for new content")
+                self._detected_encoding = suggested_encoding
+                self.encoding = suggested_encoding
 
         try:
             return data.decode(self.encoding, errors="replace")
         except LookupError:
             # Fallback to UTF-8 if encoding not supported
-            if self._detected_encoding is None:
+            if self._detected_encoding != "utf-8":
                 self._detected_encoding = "utf-8"
                 self.encoding = self._detected_encoding
+                print(f"Debug: Fallback to UTF-8 encoding for new content")
             return data.decode("utf-8", errors="replace")
     
 
