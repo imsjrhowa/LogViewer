@@ -213,12 +213,13 @@ class FileManager:
             except OSError:
                 pass
 
-    def read_entire_file(self, chunk_size: int = 1024 * 1024) -> str:
+    def read_entire_file(self, chunk_size: int = 1024 * 1024, progress_callback=None) -> str:
         """
         Read the entire file with chunked reading for large files.
         
         Args:
             chunk_size: Size of chunks to read (default 1MB)
+            progress_callback: Optional callback function(progress, message) for progress updates
             
         Returns:
             Entire file content as string
@@ -229,14 +230,33 @@ class FileManager:
             except OSError:
                 return ""
 
+        # Get file size for progress calculation
+        try:
+            file_size = os.path.getsize(self.path)
+        except OSError:
+            file_size = 0
+
         self._fh.seek(0)
         content = []
+        total_read = 0
+        
+        if progress_callback:
+            progress_callback(0, "Starting file read...")
         
         while True:
             chunk = self._fh.read(chunk_size)
             if not chunk:
                 break
             content.append(chunk)
+            total_read += len(chunk)
+            
+            # Update progress if callback provided
+            if progress_callback and file_size > 0:
+                progress = (total_read / file_size) * 100.0
+                progress_callback(progress, f"Reading... {self._format_size(total_read)} / {self._format_size(file_size)}")
+        
+        if progress_callback:
+            progress_callback(80, "Processing file content...")
         
         # Combine all chunks
         data = b''.join(content)
@@ -249,12 +269,18 @@ class FileManager:
             self._detected_encoding = "utf-16-le"
             self.encoding = self._detected_encoding
 
+        if progress_callback:
+            progress_callback(90, "Decoding content...")
+
         try:
             decoded_content = data.decode(self.encoding, errors="replace")
             
             # IMPORTANT: Set position to end for future tailing AFTER reading
             # This ensures we start monitoring from the current end of file
             self._pos = self._fh.tell()
+            
+            if progress_callback:
+                progress_callback(100, "File read complete")
             
             return decoded_content
         except LookupError:
@@ -267,7 +293,24 @@ class FileManager:
             # Set position to end for future tailing
             self._pos = self._fh.tell()
             
+            if progress_callback:
+                progress_callback(100, "File read complete (UTF-8 fallback)")
+            
             return decoded_content
+    
+    def _format_size(self, size_bytes: int) -> str:
+        """Format file size in human-readable format."""
+        try:
+            if size_bytes < 1024:
+                return f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                return f"{size_bytes / 1024:.1f} KB"
+            elif size_bytes < 1024 * 1024 * 1024:
+                return f"{size_bytes / (1024 * 1024):.1f} MB"
+            else:
+                return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+        except Exception:
+            return f"{size_bytes} bytes"
 
     def read_new_text(self) -> str:
         """

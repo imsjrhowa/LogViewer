@@ -22,7 +22,7 @@ from src.utils.constants import (
     FILTER_DEBOUNCE_MS, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT,
     LINE_NUMBER_WIDTH, BUILD_NUMBER
 )
-from .dialogs import SettingsDialog
+from .dialogs import SettingsDialog, FileLoadingDialog
 
 
 class LogViewerApp(tk.Tk):
@@ -591,11 +591,27 @@ class LogViewerApp(tk.Tk):
         Uses chunked reading for large files to manage memory efficiently.
         
         Args:
-            path: Path to the log file to open
+            path: Path to log file to open
             first_open: Whether this is the first file opened in this session
         """
         self.path = path
         self.path_label.config(text=path)
+        
+        # Check file size to determine if we need a loading dialog
+        try:
+            file_size = os.path.getsize(path)
+            show_loading = file_size > 1024 * 1024  # Show loading for files > 1MB
+        except OSError:
+            show_loading = False
+            file_size = 0
+        
+        loading_dialog = None
+        if show_loading:
+            filename = os.path.basename(path)
+            loading_dialog = FileLoadingDialog(self, filename)
+            loading_dialog.set_file_size(file_size)
+            loading_dialog.update_message(f"Opening {filename}...")
+            self.update_idletasks()
         
         try:
             if not self.file_manager:
@@ -614,13 +630,25 @@ class LogViewerApp(tk.Tk):
                 self._clear_current_view()
             
             # Read entire file with chunked reading for large files
-            text = self.file_manager.read_entire_file()
+            if loading_dialog:
+                # Create progress callback for the loading dialog
+                def progress_callback(progress, message):
+                    loading_dialog.update_progress(progress, message)
+                    self.update_idletasks()
+                
+                text = self.file_manager.read_entire_file(progress_callback=progress_callback)
+            else:
+                text = self.file_manager.read_entire_file()
+            
             if text:
                 # For new files, use _load_file_content instead of _append
                 if not first_open:
                     self._load_file_content(text)
                 else:
                     self._append(text)
+                
+
+                
                 self._set_heartbeat_state("active")
                 self._set_status(f"File loaded ({len(text.splitlines()):,} lines)")
             else:
@@ -628,9 +656,15 @@ class LogViewerApp(tk.Tk):
                 self._set_status("File opened (empty)")
                 
         except Exception as e:
+            if loading_dialog:
+                loading_dialog.close()
             messagebox.showerror("Error", "Failed to open file:\n{}".format(e))
             self._set_heartbeat_state("error")
             self._set_status("Open failed")
+        finally:
+            # Always close the loading dialog
+            if loading_dialog:
+                loading_dialog.close()
     
     def _poll(self):
         """
