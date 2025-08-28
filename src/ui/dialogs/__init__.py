@@ -7,5 +7,6 @@ and other modal dialogs.
 """
 
 from .settings_dialog import SettingsDialog
+from .loading_dialog import LoadingDialog, FileLoadingDialog
 
-__all__ = ['SettingsDialog']
+__all__ = ['SettingsDialog', 'LoadingDialog', 'FileLoadingDialog']
