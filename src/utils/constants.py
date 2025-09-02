@@ -11,7 +11,7 @@ APP_NAME = "Log Viewer"
 APP_VERSION = "v0.3"
 APP_DESCRIPTION = "Real-time log file monitor with advanced filtering"
 APP_AUTHOR = "Log Viewer Team"
-BUILD_NUMBER = 15
+BUILD_NUMBER = 16
 
 # Application defaults
 

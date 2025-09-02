@@ -37,6 +37,8 @@ class FileManager:
         self._inode = None  # File inode for detecting rotation
         self._pos = 0  # Current file position
         self._detected_encoding = None  # Store detected encoding to avoid re-detection
+        self._last_file_size = 0  # Track last known file size
+        self._truncation_callback = None  # Callback for file truncation events
 
     def _encoding_from_bom(self, fh) -> Optional[str]:
         """
@@ -95,6 +97,13 @@ class FileManager:
         # Always start from beginning for initial load
         self._fh.seek(0)
         self._pos = 0
+        
+        # Initialize file size tracking
+        try:
+            self._last_file_size = os.path.getsize(self.path)
+        except OSError:
+            self._last_file_size = 0
+        
         return True
 
     def close(self):
@@ -119,6 +128,15 @@ class FileManager:
         # Close and reopen to ensure fresh encoding detection
         if self._fh:
             self.close()
+    
+    def set_truncation_callback(self, callback):
+        """
+        Set callback function to be called when file truncation is detected.
+        
+        Args:
+            callback: Function to call when truncation detected (should take no arguments)
+        """
+        self._truncation_callback = callback
     
     def _analyze_content_encoding(self, data: bytes) -> str:
         """
@@ -195,12 +213,14 @@ class FileManager:
         try:
             st_path = os.stat(self.path)
             inode = (st_path.st_dev, st_path.st_ino)
+            current_size = st_path.st_size
         except OSError:
             return  # Possibly temporarily missing during rotation
             
         if self._inode and inode != self._inode:
             # File rotated/recreated - reopen from beginning
             self.open(start_at_end=False)
+            self._last_file_size = current_size
             return
             
         if self._fh:
@@ -210,8 +230,20 @@ class FileManager:
                     # File truncated - reset to beginning
                     self._fh.seek(0)
                     self._pos = 0
+                    
+                    # Check if file size has significantly decreased (more than 50% reduction)
+                    if (self._last_file_size > 0 and 
+                        current_size < self._last_file_size * 0.5 and 
+                        self._truncation_callback):
+                        # Call the truncation callback to notify main window
+                        self._truncation_callback()
+                    
+                    self._last_file_size = current_size
             except OSError:
                 pass
+        
+        # Update last known file size
+        self._last_file_size = current_size
 
     def read_entire_file(self, chunk_size: int = 1024 * 1024, progress_callback=None) -> str:
         """
@@ -241,7 +273,7 @@ class FileManager:
         total_read = 0
         
         if progress_callback:
-            progress_callback(0, "Starting file read...")
+            progress_callback(0, "")
         
         while True:
             chunk = self._fh.read(chunk_size)
@@ -253,10 +285,11 @@ class FileManager:
             # Update progress if callback provided
             if progress_callback and file_size > 0:
                 progress = (total_read / file_size) * 100.0
-                progress_callback(progress, f"Reading... {self._format_size(total_read)} / {self._format_size(file_size)}")
+                progress_callback(progress, f"{self._format_size(total_read)} / {self._format_size(file_size)}")
+                
         
         if progress_callback:
-            progress_callback(80, "Processing file content...")
+            progress_callback(80, "")
         
         # Combine all chunks
         data = b''.join(content)
@@ -270,7 +303,7 @@ class FileManager:
             self.encoding = self._detected_encoding
 
         if progress_callback:
-            progress_callback(90, "Decoding content...")
+            progress_callback(90, "")
 
         try:
             decoded_content = data.decode(self.encoding, errors="replace")
@@ -280,7 +313,8 @@ class FileManager:
             self._pos = self._fh.tell()
             
             if progress_callback:
-                progress_callback(100, "File read complete")
+                progress_callback(99, "                                              ")
+                progress_callback(100, "Reading!")
             
             return decoded_content
         except LookupError:

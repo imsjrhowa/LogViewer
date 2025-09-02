@@ -616,6 +616,8 @@ class LogViewerApp(tk.Tk):
         try:
             if not self.file_manager:
                 self.file_manager = FileManager(path)
+                # Set up truncation callback for automatic file reloading
+                self.file_manager.set_truncation_callback(self._handle_file_truncation)
             else:
                 # Force re-detection of encoding for the file (even if same path)
                 self.file_manager.force_encoding_detection()
@@ -646,9 +648,7 @@ class LogViewerApp(tk.Tk):
                     self._load_file_content(text)
                 else:
                     self._append(text)
-                
-
-                
+                                
                 self._set_heartbeat_state("active")
                 self._set_status(f"File loaded ({len(text.splitlines()):,} lines)")
             else:
@@ -665,6 +665,33 @@ class LogViewerApp(tk.Tk):
             # Always close the loading dialog
             if loading_dialog:
                 loading_dialog.close()
+    
+    def _handle_file_truncation(self):
+        """
+        Handle file truncation events.
+        
+        Called when the monitored file becomes significantly smaller,
+        indicating it was cleared or rotated. Automatically reloads the file.
+        """
+        try:
+            if self.path and self.file_manager:
+                self._set_status("File truncated - reloading...")
+                self._set_heartbeat_state("active")
+                
+                # Clear current view and reload file
+                self._clear_current_view()
+                
+                # Read entire file again
+                text = self.file_manager.read_entire_file()
+                if text:
+                    self._load_file_content(text)
+                    self._set_status(f"File reloaded after truncation ({len(text.splitlines()):,} lines)")
+                else:
+                    self._set_status("File reloaded (empty after truncation)")
+                    
+        except Exception as e:
+            self._set_heartbeat_state("error")
+            self._set_status(f"Error reloading truncated file: {e}")
     
     def _poll(self):
         """
