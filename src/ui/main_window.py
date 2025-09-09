@@ -218,6 +218,12 @@ class LogViewerApp(tk.Tk):
         self.bind('<Escape>', lambda e: self._clear_filter())        # Clear filter
         self.bind('<Control-r>', lambda e: self._focus_filter())     # Focus filter (alternative)
         self.bind('<Control-R>', lambda e: self._focus_filter())     # Focus filter (alternative, Shift)
+        
+        # Text selection and copy shortcuts
+        self.bind('<Control-c>', lambda e: self._copy_selected_text())  # Copy selected text
+        self.bind('<Control-C>', lambda e: self._copy_selected_text())  # Copy selected text (Shift)
+        self.bind('<Control-a>', lambda e: self._select_all_text())     # Select all text
+        self.bind('<Control-A>', lambda e: self._select_all_text())     # Select all text (Shift)
 
         # Create a multi-row toolbar container
         toolbar = ttk.Frame(self, padding=(8, 4))
@@ -336,7 +342,11 @@ class LogViewerApp(tk.Tk):
             text_content_frame,
             wrap=tk.WORD if self.wrap.get() else tk.NONE,  # Word wrap based on setting
             undo=False,                  # Disable undo for performance
-            font=("Consolas", 11)       # Monospace font for log readability
+            font=("Consolas", 11),      # Monospace font for log readability
+            selectbackground="#0078d4",  # Blue selection background
+            selectforeground="white",    # White selection text
+            exportselection=True,        # Enable text selection and copying
+            state=tk.NORMAL              # Allow text selection (not DISABLED)
         )
 
         # Scrollbars for navigation
@@ -365,6 +375,10 @@ class LogViewerApp(tk.Tk):
         self.text.bind('<Button-4>', self._on_mouse_wheel)    # Linux scroll up
         self.text.bind('<Button-5>', self._on_mouse_wheel)    # Linux scroll down
         self.show_line_numbers.trace_add('write', lambda *args: self._toggle_line_numbers())
+        
+        # Bind right-click context menu for text operations
+        self.text.bind('<Button-3>', self._show_text_context_menu)  # Right-click context menu
+        self.text.bind('<Control-Button-1>', self._show_text_context_menu)  # Ctrl+click context menu
         
         # Bind scrollbar to update line numbers
         yscroll.config(command=lambda *args: self._on_yscroll(*args))
@@ -1013,6 +1027,9 @@ class LogViewerApp(tk.Tk):
                 self._restore_original_view()
                 return
             
+            # Ensure text widget is in normal state for editing
+            self.text.config(state=tk.NORMAL)
+            
             # Clear current display
             self.text.delete('1.0', tk.END)
             at_end = True
@@ -1069,6 +1086,9 @@ class LogViewerApp(tk.Tk):
         ensuring line numbers and content are correctly aligned.
         """
         try:
+            # Ensure text widget is in normal state for editing
+            self.text.config(state=tk.NORMAL)
+            
             # Clear current display
             self.text.delete('1.0', tk.END)
             
@@ -1734,6 +1754,93 @@ class LogViewerApp(tk.Tk):
         self.filter_entry.focus_set()
         self.filter_entry.select_range(0, tk.END)
     
+    def _copy_selected_text(self):
+        """
+        Copy selected text to clipboard.
+        
+        Copies the currently selected text in the log viewer to the system clipboard.
+        If no text is selected, shows a status message.
+        """
+        try:
+            # Check if there's any text selected
+            if self.text.tag_ranges(tk.SEL):
+                # Get the selected text
+                selected_text = self.text.get(tk.SEL_FIRST, tk.SEL_LAST)
+                
+                # Copy to clipboard
+                self.clipboard_clear()
+                self.clipboard_append(selected_text)
+                
+                # Show confirmation in status bar
+                char_count = len(selected_text)
+                line_count = selected_text.count('\n') + 1
+                self._set_status(f"Copied {char_count} characters ({line_count} lines) to clipboard")
+            else:
+                self._set_status("No text selected")
+        except Exception as e:
+            self._set_status(f"Copy failed: {e}")
+    
+    def _select_all_text(self):
+        """
+        Select all text in the log viewer.
+        
+        Selects all visible text in the main text widget for easy copying.
+        """
+        try:
+            # Focus the text widget first
+            self.text.focus_set()
+            
+            # Select all text
+            self.text.tag_add(tk.SEL, "1.0", tk.END)
+            self.text.mark_set(tk.INSERT, tk.END)
+            self.text.see(tk.INSERT)
+            
+            # Show confirmation in status bar
+            total_chars = len(self.text.get("1.0", tk.END))
+            total_lines = int(self.text.index('end-1c').split('.')[0])
+            self._set_status(f"Selected all text ({total_chars} characters, {total_lines} lines)")
+        except Exception as e:
+            self._set_status(f"Select all failed: {e}")
+    
+    def _show_text_context_menu(self, event):
+        """
+        Show context menu for text operations.
+        
+        Displays a right-click context menu with copy, select all, and other text operations.
+        
+        Args:
+            event: Mouse event that triggered the context menu
+        """
+        try:
+            # Create context menu
+            context_menu = tk.Menu(self, tearoff=0)
+            
+            # Add menu items
+            context_menu.add_command(label="Copy", command=self._copy_selected_text)
+            context_menu.add_separator()
+            context_menu.add_command(label="Select All", command=self._select_all_text)
+            context_menu.add_separator()
+            context_menu.add_command(label="Clear Selection", command=self._clear_selection)
+            
+            # Show menu at cursor position
+            context_menu.post(event.x_root, event.y_root)
+        except Exception as e:
+            self._set_status(f"Context menu failed: {e}")
+    
+    def _clear_selection(self):
+        """
+        Clear current text selection.
+        
+        Removes any current text selection in the main text widget.
+        """
+        try:
+            # Clear selection by moving cursor to current position
+            self.text.tag_remove(tk.SEL, "1.0", tk.END)
+            self.text.mark_set(tk.INSERT, tk.INSERT)
+            self._set_status("Selection cleared")
+        except Exception as e:
+            self._set_status(f"Clear selection failed: {e}")
+    
     def _load_file_content(self, s: str):
         """
         Load file content into the display, bypassing filters.
@@ -1743,6 +1850,9 @@ class LogViewerApp(tk.Tk):
         Args:
             s: File content to load
         """
+        # Ensure text widget is in normal state for editing
+        self.text.config(state=tk.NORMAL)
+        
         # Clear existing content first
         self.text.delete('1.0', tk.END)
         self._line_buffer.clear()
@@ -1750,6 +1860,9 @@ class LogViewerApp(tk.Tk):
         
         # Insert the entire content at once to preserve formatting
         self.text.insert('1.0', s)
+        
+        # Make text widget read-only but allow selection
+        self.text.config(state=tk.NORMAL)
         
         # Break content into lines and store in buffer (for filtering later)
         lines = s.splitlines(True)  # keep line endings
@@ -1773,6 +1886,9 @@ class LogViewerApp(tk.Tk):
         Args:
             s: New text content to append
         """
+        # Ensure text widget is in normal state for editing
+        self.text.config(state=tk.NORMAL)
+        
         # Break incoming chunk into lines, store, and append only matching ones
         lines = s.splitlines(True)  # keep line endings
         if not lines:
@@ -1874,6 +1990,13 @@ View Controls:
 • Ctrl+W - Toggle word wrap
 • Ctrl+P - Pause/Resume monitoring
 • Ctrl+L - Toggle line numbers
+
+Text Selection & Copy:
+• Ctrl+C - Copy selected text
+• Ctrl+A - Select all text
+• Mouse drag - Select text range
+• Double-click - Select word
+• Triple-click - Select line
 
 Filtering:
 • Ctrl+F - Focus filter box
